@@ -351,8 +351,16 @@ final class C3ProtocolTest extends TestCase
             $this->assertSame(Capability::CONFIRMED, $caps->level(Capability::DEVICE_INFO), $model->name());
             $this->assertSame(Capability::CONFIRMED, $caps->level(Capability::ATTENDANCE_READ), $model->name());
 
-            // Never run against either panel.
-            $this->assertSame(Capability::IMPLEMENTED, $caps->level(Capability::USER_READ), $model->name());
+            // Promoted 2026-09-14 when a roster read actually ran on both panels.
+            $this->assertSame(Capability::CONFIRMED, $caps->level(Capability::USER_READ), $model->name());
+
+            // Still never run: the template table is a separate read this library
+            // does not do, so finger slots come back null meaning "not read".
+            $this->assertSame(
+                Capability::NOT_IMPLEMENTED,
+                $caps->level(Capability::TEMPLATE_TABLE_READ),
+                $model->name(),
+            );
         }
     }
 

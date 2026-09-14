@@ -61,6 +61,11 @@ final class Tf1700 implements PanelModel
             Capability::PING => Capability::CONFIRMED,
             Capability::DEVICE_INFO => Capability::CONFIRMED,
             Capability::ATTENDANCE_READ => Capability::CONFIRMED,
+            // Promoted 2026-09-14 after an actual roster read through the app's own
+            // driver: 320 users, all named, 145 carrying a card. Until that ran it
+            // was IMPLEMENTED — the table was in the catalogue and the code path
+            // existed, which is not the same as having read it (rule 10).
+            Capability::USER_READ => Capability::CONFIRMED,
         ]);
     }
 

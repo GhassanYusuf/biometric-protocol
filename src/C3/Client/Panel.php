@@ -24,6 +24,7 @@ use Promoseven\Biometric\C3\Transport\C3TcpTransport;
 use Promoseven\Biometric\Exception\DeviceException;
 use Promoseven\Biometric\Exception\ProtocolException;
 use Promoseven\Biometric\Value\DeviceConfig;
+use Promoseven\Biometric\Value\DeviceUser;
 
 /**
  * A C3 / PullSDK access-control panel.
@@ -219,6 +220,43 @@ final class Panel
         }
 
         return $records;
+    }
+
+    /**
+     * The panel's roster, in the library's vendor-neutral user shape.
+     *
+     * The mapping lives HERE and not in a consumer's driver, for the same reason
+     * readAttendance() does: a host application should never have to know that this
+     * family calls the id column `Pin` while the standalone protocol calls it
+     * `user_id`. That knowledge is protocol knowledge (rule 8).
+     *
+     * FINGERPRINT SLOTS ARE NULL, AND THAT IS A REAL ANSWER. The panel keeps
+     * templates in a separate table (`templatev10`) which this library does not read
+     * yet, so we do not know which slots are filled. Null means "not read"; it must
+     * never be rendered as "none enrolled", which would tell an operator that
+     * somebody with ten fingers registered has zero (rule 10).
+     *
+     * @param  ?callable(\Promoseven\Biometric\Value\Progress):void  $onProgress
+     * @return list<DeviceUser>
+     */
+    public function readUsers(?callable $onProgress = null): array
+    {
+        $users = [];
+
+        foreach ($this->readTable('user', $onProgress) as $row) {
+            $card = (int) ($row['CardNo'] ?? 0);
+
+            $users[] = new DeviceUser(
+                uid: (int) ($row['UID'] ?? 0),
+                userId: (string) ($row['Pin'] ?? ''),
+                name: (string) ($row['Name'] ?? ''),
+                privilege: (int) ($row['Privilege'] ?? 0),
+                cardNumber: $card > 0 ? $card : null,
+                fingerSlots: null,
+            );
+        }
+
+        return $users;
     }
 
     /**
