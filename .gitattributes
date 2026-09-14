@@ -1,0 +1,10 @@
+# Normalise line endings so a licensee on any OS gets identical files.
+* text=auto eol=lf
+*.bin binary
+
+# Keep development scaffolding out of distributed archives: a licensee receives
+# src/, the licence and the readme, not the test suite or CI config.
+/tests           export-ignore
+/phpunit.xml     export-ignore
+/.gitignore      export-ignore
+/.gitattributes  export-ignore

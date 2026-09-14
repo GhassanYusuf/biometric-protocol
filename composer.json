@@ -1,0 +1,49 @@
+{
+    "name": "promoseven/biometric-protocol",
+    "description": "Framework-agnostic PHP library for standalone biometric terminals that speak the ZKTeco network protocol. Reads attendance, users, fingerprint templates and cards and drives enrollment over plain UDP/TCP, with no vendor DLL, OCX or SDK runtime.",
+    "type": "library",
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "Ghassan Yusuf",
+            "email": "g.yusuf@promoseven.com",
+            "role": "Author"
+        }
+    ],
+    "keywords": [
+        "biometric",
+        "attendance",
+        "fingerprint",
+        "protocol",
+        "terminal",
+        "zkteco",
+        "f18"
+    ],
+    "require": {
+        "php": "^8.2"
+    },
+    "suggest": {
+        "ext-sockets": "Raises the UDP receive buffer above the 64KB default so a whole attendance table fits. Without it, bulk reads on large tables are markedly more likely to fail with 'Incomplete transfer'."
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Promoseven\\Biometric\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Promoseven\\Biometric\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

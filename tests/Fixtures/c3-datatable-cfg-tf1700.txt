@@ -1,0 +1,6 @@
+user=1,UID=i1,CardNo=i2,Pin=i3,Password=s4,Group=i5,StartTime=i6,EndTime=i7,Name=s8,Privilege=i9,SuperAuthorize=i10
+userauthorize=2,Pin=i1,AuthorizeTimezoneId=i2,AuthorizeDoorId=i3
+holiday=3,Holiday=i1,HolidayType=i2,Loop=i3
+transaction=5,Cardno=i1,Pin=i2,Verified=i3,DoorID=i4,EventType=i5,InOutState=i6,Time_second=i7
+templatev10=10,Size=i1,UID=i2,Pin=i3,FingerID=i4,Valid=i5,Template=B6,Resverd=i7,EndTag=i8
+oplog=11,Admin=i1,OP=i2,time=i3,Objs1=i4,Objs2=i5,Objs3=i6,Objs4=i7,Objs5=i8

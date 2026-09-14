@@ -1,0 +1,92 @@
+PROPRIETARY SOFTWARE LICENCE
+promoseven/biometric-protocol
+
+Copyright (c) 2026 Promoseven. All rights reserved.
+
+
+1. NO LICENCE BY DEFAULT
+
+This software is proprietary and confidential. It is NOT open source and it is
+NOT free software. No licence, right or permission to use, copy, install, run,
+modify, merge, publish, distribute, sublicense, sell, host or make available
+this software or any part of it is granted to any person or entity except under
+a separate signed written agreement with the copyright holder.
+
+Possession of a copy of this software does not grant any licence to it.
+
+
+2. IF YOU HAVE A SIGNED AGREEMENT
+
+Where a signed written agreement exists, that agreement governs, and this file
+is subordinate to it. Absent any term to the contrary in that agreement, the
+following restrictions apply and survive:
+
+  a) The software may be used only by the named licensee, only for the licensee's
+     own internal business purposes, and only within the scope (number of
+     terminals, sites, tenants or installations) the agreement specifies.
+
+  b) The software may not be redistributed, resold, sublicensed, published,
+     leased, or made available to any third party, whether standalone or embedded
+     in another product, and whether or not for a fee. Embedding this software in
+     a product delivered to third parties requires a separate written OEM or
+     redistribution licence.
+
+  c) The source code is a trade secret of the copyright holder. It may not be
+     disclosed to any third party, and must be protected with at least the care
+     the licensee applies to its own confidential source code.
+
+  d) The software may not be reverse engineered, decompiled, deobfuscated, or
+     disassembled, and no copyright notice, licence notice, version identifier or
+     build fingerprint may be removed, obscured or altered.
+
+  e) All copyright, trade secret and other intellectual property rights in the
+     software remain with the copyright holder. Nothing transfers ownership.
+
+
+3. NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+This software communicates with third-party biometric hardware over a network
+protocol that the manufacturer does not publish. Device behaviour varies by
+model and firmware revision. The copyright holder does not warrant that any
+particular device, model or firmware will work, nor that data read from a device
+is complete or accurate. Capability levels declared in the software
+(`confirmed`, `implemented`, `not_implemented`, `unknown`) are statements about
+what has been observed on specific hardware, not warranties.
+
+Attendance data produced by this software may be used for payroll. The licensee
+is responsible for verifying it. See the reconciliation and sync-run record
+counters, which exist for that purpose.
+
+
+4. LIMITATION OF LIABILITY
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE, INCLUDING WITHOUT LIMITATION ANY LOSS OF DATA, LOSS OF PROFITS, OR
+PAYROLL, WAGE OR EMPLOYMENT-RELATED LOSS OR CLAIM.
+
+
+5. TERMINATION
+
+Any use outside the scope of a signed agreement, and any breach of section 2,
+terminates all rights under that agreement immediately and without notice. On
+termination the licensee must cease all use and destroy all copies.
+
+
+6. TRADEMARKS
+
+"ZKTeco" and other third-party names that appear in this software and its
+documentation are the trademarks of their respective owners. They are used
+solely to describe the hardware and network protocol this software
+interoperates with. No affiliation with, sponsorship by, or endorsement from any
+such owner is claimed or implied.
+
+
+CONTACT
+
+Promoseven — g.yusuf@promoseven.com
