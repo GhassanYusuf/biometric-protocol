@@ -174,6 +174,59 @@ final class TemplateService
     }
 
     /**
+     * Every stored template on the device, WITH its bytes.
+     *
+     * Reads the same table slotsByUserId() reads; the difference is that this keeps
+     * the blob each record carries instead of stepping over it. No extra command, no
+     * extra round trip — the bytes were always arriving.
+     *
+     * The blob is the device's own encoding and must be treated as an OPAQUE
+     * IDENTIFIER, never as a fingerprint that can be compared to another one:
+     *
+     *   identical bytes  -> the same enrolment, copied between terminals by a vendor
+     *                       tool. Strong evidence that two device records are one person.
+     *   different bytes  -> proves NOTHING. The same finger presented twice yields a
+     *                       different template every time, and this library has no
+     *                       matcher.
+     *
+     * An empty array means the table would not decode — UNKNOWN, never "nobody has
+     * fingerprints" (rule 10).
+     *
+     * CONFIRMED on the ZKTeco F18 @ 192.168.7.62.
+     *
+     * @return list<array{user_id:?string,uid:int,fid:int,valid:int,template:string,size:int,sha1:string}>
+     */
+    public function allWithTemplates(): array
+    {
+        $records = TemplateCodec::decodeWithBlobs($this->client->readTemplatesRaw());
+
+        if ($records === []) {
+            return [];
+        }
+
+        // uid is the device-internal slot number and is not portable between devices;
+        // the user id is what a caller can actually match on.
+        $userIdByUid = [];
+        foreach (UserCodec::decode($this->client->readUsersRaw()) as $user) {
+            if (isset($user['uid'], $user['user_id']) && $user['user_id'] !== '') {
+                $userIdByUid[$user['uid']] = (string) $user['user_id'];
+            }
+        }
+
+        return array_map(static fn (array $r) => [
+            'user_id' => $userIdByUid[$r['uid']] ?? null,
+            'uid' => $r['uid'],
+            'fid' => $r['fid'],
+            'valid' => $r['valid'],
+            'template' => $r['template'],
+            'size' => strlen($r['template']),
+            // Carried alongside so a caller can compare and store without ever
+            // holding biometric bytes itself.
+            'sha1' => sha1($r['template']),
+        ], $records);
+    }
+
+    /**
      * Raw template table bytes, for archiving or calibrating a decoder.
      *
      * This is how the 22,066-byte fixture in tests/Fixtures was captured. Keep a

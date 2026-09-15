@@ -235,6 +235,75 @@ final class WindowedReadTest extends TestCase
             'Offset 0 was re-read — it restarted instead of resuming on the fresh session.');
     }
 
+    public function test_a_table_that_grows_mid_transfer_still_completes(): void
+    {
+        /*
+         * THE CAMELOT F18, 2026-09-14. A 1.66 MB attendance table takes minutes over
+         * a public IP, and a re-stage is needed part-way through. Somebody badged
+         * during that read: the staged size went from 1,665,484 to 1,665,524 — forty
+         * bytes, exactly one attendance record — and the reader threw after fourteen
+         * minutes of work.
+         *
+         * Any read long enough to need a re-stage is long enough for somebody to
+         * badge, so this was not an edge case. It made a full read IMPOSSIBLE on a
+         * terminal that is still in service.
+         *
+         * The table is append-only, so the bytes we committed to are unchanged. The
+         * read completes against the size it started with and the new records arrive
+         * on the next read, which every caller is incremental enough to handle.
+         */
+        $table = str_repeat('abcdefgh', 5_000); // 40,000 bytes
+        $transport = new WindowedTransport(
+            $table,
+            wedgeUntilReopenAtOffset: 16_384,
+            resizeOnRestage: 40,               // one attendance record
+        );
+
+        $this->assertSame($table, $this->read($transport), 'A growing table must still return its committed bytes.');
+        $this->assertGreaterThan(1, $transport->stages, 'The scenario needs a re-stage to be meaningful.');
+    }
+
+    public function test_a_table_that_shrinks_mid_transfer_is_abandoned(): void
+    {
+        /*
+         * The opposite fact, and it must keep failing. A SMALLER table means it was
+         * cleared or rolled over, so the offsets already read address different
+         * records than they did. Continuing would return rows that look entirely
+         * real and are not — the exact failure rule 10 exists for.
+         *
+         * Growth and shrinkage share a symptom (the size changed) and mean opposite
+         * things, which is why they must never share a branch.
+         */
+        $table = str_repeat('abcdefgh', 5_000);
+        $transport = new WindowedTransport(
+            $table,
+            wedgeUntilReopenAtOffset: 16_384,
+            resizeOnRestage: -40,
+        );
+
+        // The in-flight transfer is abandoned. read() then makes a FRESH attempt,
+        // which is correct — re-reading a table that really was cleared is exactly
+        // what should happen. What must never happen is resuming across the change,
+        // so the tell is that offset 0 is read again rather than the reader carrying
+        // on from where it had got to.
+        try {
+            $this->read($transport);
+        } catch (ProtocolException $e) {
+            $this->assertStringContainsString('SHRANK', $e->getMessage());
+
+            return;
+        }
+
+        $starts = array_map(static fn (array $w) => $w[0], $transport->windows);
+
+        $this->assertGreaterThan(
+            1,
+            count(array_filter($starts, static fn ($s) => $s === 0)),
+            'A shrunken table was RESUMED across rather than restarted — the buffer would '
+                .'mix records from two different states of the table.',
+        );
+    }
+
     public function test_a_completed_read_survives_a_free_data_timeout(): void
     {
         /*
@@ -310,8 +379,19 @@ class WindowedTransport implements Transport
         private readonly bool $freeDataTimesOut = false,
         private readonly ?int $requestTimeoutAtOffset = null,
         private readonly ?int $wedgeUntilReopenAtOffset = null,
+        /**
+         * Bytes the table changes by on every RE-stage, signed.
+         *
+         * Positive models a live terminal: somebody badges during a multi-minute
+         * read and the table grows by one record. Negative models the table being
+         * cleared or rolled over under us.
+         */
+        private readonly int $resizeOnRestage = 0,
     ) {
     }
+
+    /** How many times the table has been staged (the first stage is 1). */
+    public int $stages = 0;
 
     public function send(int $command, string $data = ''): Reply
     {
@@ -321,9 +401,17 @@ class WindowedTransport implements Transport
 
         if ($command === Command::PREPARE_BUFFER) {
             // A refusal, as the F22 gives for the users table.
-            return $this->stagingRefused
-                ? new Reply(4991, 0, 1, 1, '')
-                : $this->ack("\x00" . pack('V', strlen($this->table)));
+            if ($this->stagingRefused) {
+                return new Reply(4991, 0, 1, 1, '');
+            }
+
+            $this->stages++;
+
+            // Every re-stage after the first reports the table at its new size, the
+            // way a terminal in service does when somebody badges mid-read.
+            $declared = strlen($this->table) + ($this->stages - 1) * $this->resizeOnRestage;
+
+            return $this->ack("\x00".pack('V', max(0, $declared)));
         }
 
         if ($command === Command::FREE_DATA) {

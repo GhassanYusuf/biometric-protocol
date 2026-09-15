@@ -61,7 +61,26 @@ final class CapabilitySet
             // Approximated by clearing the card — the protocol has no suspend flag.
             Capability::USER_DISABLE => Capability::IMPLEMENTED,
 
-            // This library does not do these.
+            /*
+             * CONFIRMED on the ZKTeco F18 @ 192.168.7.62 and the F22 @ 192.168.7.63,
+             * 2026-09-15. The template table carries each blob after its 6-byte record
+             * header; the codec had simply been stepping over them. No new command, no
+             * extra round trip.
+             *
+             * PIN 261 slot 3 came back as the same 1,054 bytes from BOTH models, which
+             * is what makes a digest usable as an identity signal: a vendor tool had
+             * copied one enrolment to both terminals.
+             */
+            Capability::TEMPLATE_BLOB_READ => Capability::CONFIRMED,
+
+            /*
+             * Still not done, and the distinction matters. TEMPLATE_DOWNLOAD is the
+             * per-slot command; TEMPLATE_UPLOAD is writing a template BACK, which is
+             * the genuinely unverified half — the blob's internal format and the
+             * matching write command are both unproven, and a template that appears to
+             * save and then fails to match a real finger is worse than no feature.
+             * Reading the table (above) was never blocked by either.
+             */
             Capability::TEMPLATE_DOWNLOAD => Capability::NOT_IMPLEMENTED,
             Capability::TEMPLATE_UPLOAD => Capability::NOT_IMPLEMENTED,
 

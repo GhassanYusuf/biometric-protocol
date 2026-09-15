@@ -51,6 +51,44 @@ final class TemplateCodec
      */
     public static function decode(string $raw): array
     {
+        return array_map(
+            static fn (array $r) => ['uid' => $r['uid'], 'fid' => $r['fid']],
+            self::decodeWithBlobs($raw),
+        );
+    }
+
+    /**
+     * The same walk, keeping the TEMPLATE BLOB each record carries.
+     *
+     * WHY THIS EXISTS. decode() returns only which slots are filled, because that is
+     * all the enrollment UI needs, and for a long time the blobs were assumed not to
+     * be obtainable at all — `template.download` is still declared `not_implemented`
+     * for the separate per-slot command. That assumption was wrong about THIS table:
+     * the blob has always been sitting in the record, immediately after the 6-byte
+     * header, and was simply being stepped over.
+     *
+     * WHAT THE BLOB IS GOOD FOR, AND WHAT IT IS NOT. It is the device's own template
+     * encoding. Treat it as an OPAQUE IDENTIFIER, not as a fingerprint:
+     *
+     *   - Two records with byte-identical blobs are the same enrolled template. That
+     *     happens when a vendor tool copied one enrolment to several terminals, which
+     *     is exactly how these estates are usually set up, and it is strong evidence
+     *     that two device records are one person.
+     *   - Two DIFFERENT blobs prove nothing either way. Re-presenting the same finger
+     *     produces a different template every time; only a real matcher could compare
+     *     them, and this library does not have one.
+     *
+     * Writing a blob back to a device is a SEPARATE and still-unverified problem —
+     * see TemplateService::uploadTemplate(). Reading is safe; reading is all this does.
+     *
+     * CONFIRMED on the ZKTeco F18 @ 192.168.7.62 (2026-09-15) against the 22,066-byte
+     * capture in tests/Fixtures: 19 records, blobs of 706-1,602 bytes, 21,948 bytes of
+     * template data, the walk consuming exactly 22,062 of 22,062.
+     *
+     * @return list<array{uid:int,fid:int,valid:int,template:string}>
+     */
+    public static function decodeWithBlobs(string $raw): array
+    {
         if (strlen($raw) < 4) {
             return [];
         }
@@ -77,7 +115,14 @@ final class TemplateCodec
                 return []; // not a real finger slot — layout does not match
             }
 
-            $records[] = ['uid' => $uid, 'fid' => $fid];
+            $records[] = [
+                'uid' => $uid,
+                'fid' => $fid,
+                'valid' => ord($body[$offset + 5]),
+                // Everything after the header, for exactly the length the record
+                // declares. A zero-length blob is possible and is not an error.
+                'template' => substr($body, $offset + self::HEADER_BYTES, $recordSize - self::HEADER_BYTES),
+            ];
             $offset += $recordSize;
         }
 

@@ -172,6 +172,36 @@ concurrent sessions to one device interleave replies and *both* answers become
 wrong. Serialise per device — a queue lock, a mutex, a lockfile, whatever your
 platform offers. The library does not do this for you.
 
+## Fingerprint templates
+
+`templates()->slotsByUserId()` answers *which fingers are enrolled*. `allWithTemplates()`
+answers the same question **and hands back each template's bytes**:
+
+```php
+foreach ($device->templates()->allWithTemplates() as $t) {
+    // $t['user_id'], $t['fid'] (slot), $t['size'], $t['sha1'], $t['template']
+}
+```
+
+No extra command and no extra round trip — the blobs have always been carried in the
+table `slotsByUserId()` already reads, immediately after each record's 6-byte header.
+
+**Treat the blob as an opaque identifier, never as a fingerprint.**
+
+| | |
+|---|---|
+| Identical bytes on two devices | one enrolment, copied between terminals by a vendor tool. Strong evidence the two records are the same person. |
+| Different bytes | **proves nothing.** Re-presenting the same finger yields a different template every time, and this library has no matcher. Never read a mismatch as "different people". |
+
+CONFIRMED on a ZKTeco F18 (192.168.7.62) and F22 (192.168.7.63), 2026-09-15: user
+id 261 slot 3 returned the same 1,054 bytes from both models.
+
+Writing a template back to a device is a **separate, unverified** problem —
+`downloadTemplate()` and `uploadTemplate()` still throw. If you only need to know
+whether two records are one human, you do not need either: hash what you read.
+
+Templates are biometric data. Prefer storing the digest over the bytes.
+
 ## What the library deliberately does not do
 
 | Concern | Why it is yours |

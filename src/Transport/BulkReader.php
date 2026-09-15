@@ -127,6 +127,16 @@ final class BulkReader
 
     private const RECONNECT_BACKOFF_US = 3_000_000;
 
+    /**
+     * Bytes the table grew by while we were reading it.
+     *
+     * Non-zero means somebody used the terminal mid-transfer. It is recorded rather
+     * than ignored because it is the honest explanation for why a read returned
+     * fewer records than the device now holds — without it, the next person sees a
+     * count that does not match the device and has nothing to go on.
+     */
+    private int $grewDuringTransfer = 0;
+
     private readonly Transport $transport;
 
     /**
@@ -164,6 +174,9 @@ final class BulkReader
     {
         $lastException = null;
         $this->operation = $operation;
+        // Per read, not per instance: a reader is reused across tables and a stale
+        // count would attribute one table's growth to the next one.
+        $this->grewDuringTransfer = 0;
 
         for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
             $this->attempt = $attempt;
@@ -416,6 +429,10 @@ final class BulkReader
                             'window_bytes' => $want,
                             'window_retries' => $retries,
                             'restages' => $restages,
+                            // Non-zero means the terminal was in use while we read.
+                            // Worth knowing: a busy device is the reason a long read
+                            // needed re-staging in the first place.
+                            'grew_bytes' => $this->grewDuringTransfer,
                         ],
                     );
                 }
@@ -621,12 +638,42 @@ final class BulkReader
 
         $size = unpack('V', substr($reply->data, 1, 4))[1];
 
-        if ($size !== $expectedSize) {
+        /*
+         * A TABLE THAT GREW IS NORMAL. A TABLE THAT SHRANK IS NOT.
+         *
+         * Until 2026-09-14 any change in the re-staged size aborted the read. That
+         * made a full read IMPOSSIBLE on a terminal still in service across a slow
+         * link: CONFIRMED on the Camelot F18 (87.237.196.60), where a 1.66 MB
+         * attendance table takes minutes over a public IP and somebody badging
+         * mid-read grew the staged size from 1,665,484 to 1,665,524 — exactly 40
+         * bytes, which is exactly one attendance record. The read then threw after
+         * fourteen minutes of work. Any read long enough to need a re-stage is long
+         * enough for somebody to badge, so this was not an edge case; it was the
+         * normal outcome for that device.
+         *
+         * GROWTH is safe to read through. The attendance table is append-only, so
+         * the first $expectedSize bytes of the fresh copy are the same records we
+         * have been reading. We keep reading to the size we committed to and let the
+         * new records arrive on the next read — every caller is incremental and
+         * deduplicates, so nothing is lost by deferring them. What we must NOT do is
+         * extend the target mid-flight: the caller sized its buffer and its progress
+         * against $expectedSize, and a moving target is how a transfer never ends.
+         *
+         * SHRINKAGE still aborts, and must. A smaller table means it was cleared or
+         * rolled over, so the offsets we hold address different records than they
+         * did — exactly the misalignment that produces rows which look real and are
+         * not (rule 10). There is no safe way to continue from that.
+         */
+        if ($size < $expectedSize) {
             throw new ProtocolException(
-                "Staged size changed mid-transfer: was {$expectedSize}, now {$size}.",
+                "Staged table SHRANK mid-transfer: was {$expectedSize}, now {$size}. "
+                    .'The table was cleared or rolled over, so the offsets already read no longer '
+                    .'address the same records. Abandoning rather than returning a misaligned table.',
                 ['command' => Command::name($command), 'expected' => $expectedSize, 'restaged' => $size],
             );
         }
+
+        $this->grewDuringTransfer += max(0, $size - $expectedSize);
     }
 
     private function reassemble(int $size): string

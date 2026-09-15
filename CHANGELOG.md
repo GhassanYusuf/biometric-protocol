@@ -8,6 +8,37 @@ app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
 ## 2.3.0 — 2026-09-14
 
+### Fixed — a growing table no longer aborts a windowed read
+
+- **`BulkReader` treated any change in the re-staged size as fatal**, which made a
+  full read impossible on a terminal still in service across a slow link. CONFIRMED
+  on an F18 over a public IP: a 1,665,484-byte attendance table needs several
+  re-stages, somebody badged mid-read, the size grew to 1,665,524 — exactly one
+  40-byte record — and the transfer threw after fourteen minutes.
+
+  Growth and shrinkage now mean opposite things. A **larger** table is append-only
+  growth: the read continues to the size it committed to and the new records arrive
+  on the next read. A **smaller** table was cleared or rolled over, so the offsets
+  held address different records and the transfer is still abandoned — continuing
+  would return rows that look real and are not.
+
+  A read that later fails carries `grew_bytes` in its exception context, so "the
+  terminal was in use while we read it" is recorded rather than inferred.
+
+  Re-confirmed on the F18 reference (10,531 records) and the F22 (8,162) before
+  landing, both with zero undecodable records.
+
+### Added — the roster on the driver contract
+
+- **`C3\Client\Panel::readUsers()`** maps the panel's `user` table onto `DeviceUser`,
+  so a consumer never has to know this family calls the id column `Pin`. Finger slots
+  are always **null**, meaning "not read" — templates live in a separate
+  `templatev10` table this library does not read. Null must never be rendered as
+  "none enrolled".
+
+- `USER_READ` is **confirmed** on the inBIO460 and TF1700: 320 users read from each,
+  all named, 145 carrying a card.
+
 ### Added — a SECOND protocol family
 
 - **`Promoseven\Biometric\C3`** — the ZKTeco **C3 / PullSDK** protocol, spoken by

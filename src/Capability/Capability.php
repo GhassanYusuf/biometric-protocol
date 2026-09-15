@@ -44,6 +44,15 @@ final class Capability
     public const TEMPLATE_TABLE_READ = 'template.table.read';
     public const TEMPLATE_SLOT_PROBE = 'template.slot.probe';
     public const TEMPLATE_DELETE = 'template.delete';
+    /**
+     * Reads every stored template's BYTES out of the template table.
+     *
+     * Distinct from TEMPLATE_DOWNLOAD, which is the separate per-slot command. This
+     * one needs no new command at all: the blobs have always ridden along in the table
+     * TEMPLATE_TABLE_READ already fetches.
+     */
+    public const TEMPLATE_BLOB_READ = 'template.blob.read';
+
     public const TEMPLATE_DOWNLOAD = 'template.download';
     public const TEMPLATE_UPLOAD = 'template.upload';
 

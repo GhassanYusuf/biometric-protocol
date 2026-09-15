@@ -136,6 +136,82 @@ class TemplateCodecTest extends TestCase
     }
 
     /**
+     * The blobs were always there — this is the regression guard that they still are.
+     *
+     * The template bytes sit immediately after each record's 6-byte header and were
+     * simply being stepped over. Recovering them needs no new command and no extra
+     * round trip, which is why `template.download` staying `not_implemented` (that is
+     * the separate per-slot command, and the unverified WRITE-back) never actually
+     * blocked reading.
+     */
+    public function test_it_recovers_the_template_blob_from_the_real_table(): void
+    {
+        $raw = file_get_contents(__DIR__ . '/../Fixtures/fingerprint-template-table.bin');
+
+        $records = TemplateCodec::decodeWithBlobs($raw);
+
+        $this->assertCount(19, $records);
+
+        $sizes = array_map(static fn (array $r) => strlen($r['template']), $records);
+
+        // Measured on the F18 capture. A real template is ~0.7-1.6 KB; anything far
+        // outside that means the record boundary, not the blob, has moved.
+        $this->assertSame(21948, array_sum($sizes), 'total template bytes on the reference device');
+        $this->assertSame(706, min($sizes));
+        $this->assertSame(1602, max($sizes));
+
+        foreach ($records as $record) {
+            // Header + blob must reconstruct the record length exactly, or the walk
+            // has drifted and every blob after it is misaligned garbage.
+            $this->assertNotSame('', $record['template'], 'a stored template is never empty');
+            $this->assertSame(1, $record['valid']);
+        }
+
+        /*
+         * uid 8 slot 6 is the record cross-checked against a per-slot USERTEMP_RRQ
+         * probe of the same device, which returned 1,304 bytes. That 1,304 is the
+         * RECORD, header included — the blob itself is 1,298. Worth pinning down,
+         * because reading the per-slot figure as the blob length is exactly the
+         * off-by-six that would misalign a decoder written from the doc alone.
+         */
+        $uid8 = array_values(array_filter($records, static fn (array $r) => $r['uid'] === 8))[0];
+        $this->assertSame(6, $uid8['fid']);
+        $this->assertSame(1298, strlen($uid8['template']));
+        $this->assertSame(1304, strlen($uid8['template']) + 6);
+    }
+
+    /**
+     * Identical bytes mean one enrolment copied between terminals; different bytes
+     * mean nothing at all. Only the first of those is safe to act on.
+     */
+    public function test_blobs_are_distinct_per_record_so_a_hash_identifies_one_enrolment(): void
+    {
+        $raw = file_get_contents(__DIR__ . '/../Fixtures/fingerprint-template-table.bin');
+
+        $hashes = array_map(
+            static fn (array $r) => sha1($r['template']),
+            TemplateCodec::decodeWithBlobs($raw),
+        );
+
+        // 19 separately enrolled fingers on one device produce 19 distinct templates.
+        // A collision here would mean the blob is not what identifies an enrolment.
+        $this->assertCount(19, array_unique($hashes));
+    }
+
+    /**
+     * The narrow decode() contract is unchanged: callers that only want slot
+     * occupancy must keep getting exactly {uid, fid} and nothing else.
+     */
+    public function test_decode_still_returns_only_uid_and_slot(): void
+    {
+        $raw = file_get_contents(__DIR__ . '/../Fixtures/fingerprint-template-table.bin');
+
+        foreach (TemplateCodec::decode($raw) as $record) {
+            $this->assertSame(['uid', 'fid'], array_keys($record));
+        }
+    }
+
+    /**
      * slotsByUserId maps device uid => payroll code. The empty-input case is the one
      * that matters: an unknown table must not be turned into "everybody has zero
      * fingers", which is exactly the false negative this whole codec guards against.
