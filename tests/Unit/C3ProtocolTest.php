@@ -354,13 +354,17 @@ final class C3ProtocolTest extends TestCase
             // Promoted 2026-09-14 when a roster read actually ran on both panels.
             $this->assertSame(Capability::CONFIRMED, $caps->level(Capability::USER_READ), $model->name());
 
-            // Still never run: the template table is a separate read this library
-            // does not do, so finger slots come back null meaning "not read".
-            $this->assertSame(
-                Capability::NOT_IMPLEMENTED,
-                $caps->level(Capability::TEMPLATE_TABLE_READ),
-                $model->name(),
-            );
+            /*
+             * Promoted 2026-09-15, when the `templatev10` table was finally asked for
+             * and answered: 238 records on each panel — exactly the fingercount the
+             * vendor software reports — across 196 people.
+             *
+             * It had been declared not_implemented because nobody had sent the read,
+             * not because the panel refused one. What made it LOOK unreadable was the
+             * blob's two-byte length prefix; see C3TemplateTableTest.
+             */
+            $this->assertSame(Capability::CONFIRMED, $caps->level(Capability::TEMPLATE_TABLE_READ), $model->name());
+            $this->assertSame(Capability::CONFIRMED, $caps->level(Capability::TEMPLATE_BLOB_READ), $model->name());
         }
     }
 

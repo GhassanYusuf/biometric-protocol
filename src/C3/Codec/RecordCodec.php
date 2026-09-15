@@ -20,6 +20,10 @@ namespace Promoseven\Biometric\C3\Codec;
  * bytes of value. Integers are little-endian across whatever width the panel chose,
  * which varies by field and by table — so the width is read, never assumed.
  *
+ * ONE EXCEPTION, and it is not optional: a BLOB field (type `b`/`B`, which in practice
+ * means a fingerprint template) is prefixed with TWO length bytes. It has to be — a
+ * single byte tops out at 255 and these templates run to 1,618. See the walk below.
+ *
  * WHY THE HEADER IS DETECTED AND NOT ASSUMED: an inline REPLY_OK prefixes its
  * records with the table index and the field list. Whether a BUFFERED payload
  * repeats that header is documented nowhere — not in the reference libraries and
@@ -77,7 +81,36 @@ final class RecordCodec
                     break;
                 }
 
-                $size = $data[$pos++];
+                $field = $byIndex[$fieldIndex] ?? ['name' => "f{$fieldIndex}", 'type' => 's'];
+
+                /*
+                 * A BLOB FIELD IS LENGTH-PREFIXED WITH TWO BYTES, NOT ONE.
+                 *
+                 * CONFIRMED on the inBIO460 @ 192.168.7.61 and the TF1700 @
+                 * 192.168.7.60, 2026-09-15. Every other field carries a single length
+                 * byte, so it can hold at most 255 bytes — and a fingerprint template
+                 * is 564-1,618. Reading one byte there consumed 110 of an 878-byte
+                 * template and lost alignment inside the first record; every row after
+                 * it decoded into plausible-looking nonsense, which is exactly the
+                 * failure rule 10 exists to prevent.
+                 *
+                 * With two bytes the walk consumes 281,680 of 281,680 bytes on both
+                 * panels, yielding 238 records — the figure the vendor's own
+                 * Machines.fingercount reports for each — and the declared Size field
+                 * equals the blob length on every single record.
+                 */
+                if ($field['type'] === 'b') {
+                    if ($pos + 2 > $total) {
+                        $complete = false;
+                        break;
+                    }
+
+                    $size = $data[$pos] | ($data[$pos + 1] << 8);
+                    $pos += 2;
+                } else {
+                    $size = $data[$pos++];
+                }
+
                 $raw = array_slice($data, $pos, $size);
                 $pos += $size;
 
@@ -85,8 +118,6 @@ final class RecordCodec
                     $complete = false;
                     break;
                 }
-
-                $field = $byIndex[$fieldIndex] ?? ['name' => "f{$fieldIndex}", 'type' => 's'];
 
                 if ($field['type'] === 'i') {
                     $value = 0;
@@ -97,10 +128,13 @@ final class RecordCodec
 
                     $row[$field['name']] = $value;
                 } elseif ($field['type'] === 'b') {
-                    // A template blob. The library hands back its LENGTH and not its
-                    // bytes at this layer: biometric data leaves here only through a
-                    // caller that asked for it explicitly (rule 16).
-                    $row[$field['name']] = '<'.$size.' bytes>';
+                    // The blob itself. Callers that only want to know a template is
+                    // there read its length; callers that need to compare enrolments
+                    // hash it. Neither should print it (rule 16).
+                    $row[$field['name']] = pack('C*', ...($raw ?: [0]));
+                    if ($raw === []) {
+                        $row[$field['name']] = '';
+                    }
                 } else {
                     $row[$field['name']] = rtrim(pack('C*', ...$raw), "\0");
                 }

@@ -202,6 +202,24 @@ whether two records are one human, you do not need either: hash what you read.
 
 Templates are biometric data. Prefer storing the digest over the bytes.
 
+### C3 / PullSDK panels
+
+`Panel::readTemplates()` does the same job for the access-panel family, reading the
+panel's own `templatev10` table:
+
+```
+templatev10=10,Size=i1,UID=i2,Pin=i3,FingerID=i4,Valid=i5,Template=B6,Resverd=i7,EndTag=i8
+```
+
+**A blob field is length-prefixed with TWO bytes**, where every other C3 field uses
+one. It has to be: a single byte tops out at 255 and these templates run to 1,618.
+Reading it as one byte consumes part of the first template, loses alignment, and turns
+every record after it into plausible-looking nonsense.
+
+CONFIRMED 2026-09-15 on an inBIO460 and a TF1700: 238 records each — exactly the
+fingercount the vendor software reports for them — across 196 people, every blob
+carrying the `SS21` signature at offset 2.
+
 ## What the library deliberately does not do
 
 | Concern | Why it is yours |

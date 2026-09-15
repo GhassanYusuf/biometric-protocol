@@ -175,6 +175,83 @@ final class Panel
     }
 
     /**
+     * Every stored fingerprint template on the panel, as opaque identifiers.
+     *
+     * The C3 counterpart of TemplateService::allWithTemplates(). Reads the
+     * `templatev10` table, whose schema the panel publishes itself:
+     *
+     *   templatev10=10,Size=i1,UID=i2,Pin=i3,FingerID=i4,Valid=i5,Template=B6,
+     *                  Resverd=i7,EndTag=i8
+     *
+     * CONFIRMED 2026-09-15 on the inBIO460 @ 192.168.7.61 and the TF1700 @
+     * 192.168.7.60: 238 records each, the exact figure the vendor software reports as
+     * that panel's fingercount, across 196 people, finger slots 0 and 3-9, templates
+     * of 564-1,618 bytes, every one carrying the `SS21` signature at offset 2.
+     *
+     * The blob is an OPAQUE IDENTIFIER, not a fingerprint. Identical bytes on two
+     * devices mean one enrolment copied between them; DIFFERENT bytes mean nothing at
+     * all, because re-presenting a finger yields a different template and there is no
+     * matcher here.
+     *
+     * @return list<array{user_id:string,uid:int,fid:int,valid:int,template:string,size:int,sha1:string}>
+     */
+    public function readTemplates(?callable $onProgress = null): array
+    {
+        $out = [];
+
+        foreach ($this->readTable('templatev10', $onProgress) as $row) {
+            $blob = (string) ($row['Template'] ?? '');
+
+            $out[] = [
+                // Pin is the operator-facing id attendance records carry; UID is the
+                // panel's internal slot and is not portable between devices.
+                'user_id' => (string) ($row['Pin'] ?? ''),
+                'uid' => (int) ($row['UID'] ?? 0),
+                'fid' => (int) ($row['FingerID'] ?? 0),
+                'valid' => (int) ($row['Valid'] ?? 0),
+                'template' => $blob,
+                'size' => strlen($blob),
+                'sha1' => sha1($blob),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * The raw record stream for one table, before any decoding.
+     *
+     * The C3 counterpart of TemplateService::rawTable(): for archiving a capture and
+     * for calibrating a decoder against firmware you may not have access to twice.
+     *
+     * It exists because RecordCodec cannot read every table. A C3 record prefixes each
+     * field with ONE length byte, so a field can carry at most 255 bytes — and the
+     * `templatev10` blobs are 700-1,600. Decoding that table needs a different walk,
+     * and writing one requires the bytes.
+     *
+     * A templatev10 payload is BIOMETRIC DATA. Do not archive it, log it or commit it.
+     */
+    public function readTableRaw(string $table, ?callable $onProgress = null): string
+    {
+        $catalogue = $this->catalogue();
+        $indexes = $catalogue->fieldIndexes($table);
+
+        $request = pack('C*', $catalogue->indexOf($table), count($indexes), ...$indexes, ...[0, 0]);
+
+        [$reply, $payload] = $this->command(Command::GET_DATA, $request, 20.0);
+
+        if (BufferedReader::isStaged($reply)) {
+            return (new BufferedReader($this->transport))->pull($payload, $table, $onProgress);
+        }
+
+        if ($reply !== Command::REPLY_OK) {
+            throw $this->refusal("read table '{$table}'", $reply, $payload);
+        }
+
+        return $payload;
+    }
+
+    /**
      * The transaction table, decoded into the shape the host application wants.
      *
      * Every record keeps its own `raw` payload. That is what lets a decoder fix be

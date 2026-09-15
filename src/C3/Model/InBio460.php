@@ -67,6 +67,19 @@ final class InBio460 implements PanelModel
             // was IMPLEMENTED — the table was in the catalogue and the code path
             // existed, which is not the same as having read it (rule 10).
             Capability::USER_READ => Capability::CONFIRMED,
+
+            /*
+             * CONFIRMED 2026-09-15 against this model at 192.168.7.61: the `templatev10`
+             * table answered with 238 records — exactly the fingercount the vendor
+             * software reports for it — across 196 people, templates of 564-1,618
+             * bytes, every one carrying the ZKFinger `SS21` signature.
+             *
+             * It was declared not_implemented until that day because the table had
+             * never been requested. What made it look unreadable once it was, was the
+             * blob's TWO-byte length prefix where every other C3 field uses one.
+             */
+            Capability::TEMPLATE_TABLE_READ => Capability::CONFIRMED,
+            Capability::TEMPLATE_BLOB_READ => Capability::CONFIRMED,
         ]);
     }
 

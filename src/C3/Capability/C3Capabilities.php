@@ -51,7 +51,14 @@ final class C3Capabilities
             Capability::USER_READ => Capability::IMPLEMENTED,
 
             // Built and understood, but never exercised against hardware.
-            Capability::TEMPLATE_TABLE_READ => Capability::NOT_IMPLEMENTED,
+            /*
+             * The panel publishes a `templatev10` table and this library now reads it
+             * — but a level is CONFIRMED per MODEL, never per family (rule 10). The
+             * inBIO460 and the TF1700 promote these in their own files; a panel nobody
+             * has run against inherits IMPLEMENTED and claims nothing.
+             */
+            Capability::TEMPLATE_TABLE_READ => Capability::IMPLEMENTED,
+            Capability::TEMPLATE_BLOB_READ => Capability::IMPLEMENTED,
 
             // Deliberately unbuilt. See the class note: known, not guessed at.
             Capability::USER_WRITE => Capability::NOT_IMPLEMENTED,
