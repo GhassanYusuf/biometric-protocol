@@ -76,6 +76,14 @@ final class Command
     public const DELETE_USER = 18;        // CONFIRMED
     /** Deletes ONE fingerprint template: payload is (uint16 uid, uint8 finger slot). EXPERIMENTAL. */
     public const DELETE_USERTEMP = 19;
+    /*
+     * Saves user records AND their fingerprint templates from a buffer sent with
+     * PREPARE_DATA / DATA beforehand. Undocumented by the vendor. DOCUMENTED here by
+     * transcription from fananimi/pyzk (zk/const.py `_CMD_SAVE_USERTEMPS = 110`,
+     * zk/base.py `HR_save_usertemplates`, commit f29709c1). EXPERIMENTAL: never run
+     * against hardware in this project. See Packet::buildUserTemplatesUpload().
+     */
+    public const SAVE_USERTEMPS = 110;
 
     // --- Device info / control ---
     public const WRITE_LCD = 66;          // DOCUMENTED

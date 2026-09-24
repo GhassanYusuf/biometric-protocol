@@ -33,6 +33,8 @@ final class Capability
     public const USER_WRITE = 'user.write';
     public const USER_DELETE = 'user.delete';
     public const USER_DISABLE = 'user.disable';
+    /** Move a user to a different user id (PIN), keeping uid, card and templates. */
+    public const USER_RENUMBER = 'user.renumber';
 
     // --- Cards ---
     public const CARD_READ = 'card.read';

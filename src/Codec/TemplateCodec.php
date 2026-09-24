@@ -137,6 +137,17 @@ final class TemplateCodec
     }
 
     /**
+     * True only for a table that decoded and genuinely holds no templates: the
+     * 4-byte header says zero and nothing follows. decode() returns [] for that AND
+     * for an undecodable buffer; a caller that must tell "nobody has fingers" from
+     * "could not read" asks this.
+     */
+    public static function isEmptyTable(string $raw): bool
+    {
+        return strlen($raw) === 4 && unpack('V', $raw)[1] === 0;
+    }
+
+    /**
      * Groups decoded records into device uid => sorted finger slots.
      *
      * @param list<array{uid:int,fid:int}> $records

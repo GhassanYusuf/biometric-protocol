@@ -97,6 +97,31 @@ final class UserCodec
     }
 
     /**
+     * The device's own 72-byte record for one uid, untouched, or null.
+     *
+     * For writes that must carry fields this codec does not decode (password, time
+     * zones) back to the device exactly — see Packet::withUserId().
+     */
+    public static function rawRecord(string $raw, int $uid): ?string
+    {
+        $body = RecordBuffer::body($raw);
+        $recordSize = $body === '' ? 0 : RecordBuffer::detectRecordSize(strlen($body), self::WIDTHS);
+
+        if ($recordSize !== 72) {
+            return null;
+        }
+
+        for ($offset = 0; $offset + 72 <= strlen($body); $offset += 72) {
+            $chunk = substr($body, $offset, 72);
+            if (unpack('v', substr($chunk, 0, 2))[1] === $uid) {
+                return $chunk;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Next unused device-internal uid.
      *
      * Currently max + 1 rather than gap-filling. Documented limitation: on a

@@ -6,6 +6,93 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.9.0 — 2026-09-24
+
+### Added — C3 table writes (EXPERIMENTAL; CONFIRMED on the TF1700 for `user`)
+
+- `RecordCodec::encode()` / `encodeDeleteKey()`: SET_DATA / DELETE_DATA payloads built
+  from the PANEL'S catalogue (the xub/zkaccess-c3-py fork's hard-coded field ids are
+  wrong for the TF1700). Blob fields refused. Byte-checked against the fork on its own
+  schema, and round-tripped on the TF1700's (`tests/Unit/C3RecordWriteTest.php`).
+- `Panel::writeRows()` / `Panel::deleteRows()` (key field by name).
+- `Panel::moveUser($fromPin, $toPin)`: user + userauthorize + templatev10 (under the
+  panel's NEW UID), copy-verify-then-remove, undo on failure. Blob fields encode with
+  a two-byte length when explicitly allowed. Verified on the TF1700 and the inBIO460
+  with a test user and a placeholder template.
+- 2026-09-24, TF1700 @ 192.168.7.60: add + read back + delete of a test user, every
+  other row unchanged. Capability levels unchanged.
+
+## 2.8.0 — 2026-09-24
+
+### Added — renumber by delete + re-upload (EXPERIMENTAL)
+
+The F18 refuses `renumber()` (ACK_ERROR on in-place user-id change, 2026-09-23).
+- `UserService::renumberByReupload($from, $to, $onSnapshot)`: snapshot (handed to
+  the caller before any write) → delete → re-upload record + templates under the new
+  id on the same uid → verify → restore the original on any failure.
+- `DeviceClient::saveUserWithTemplates()` and `Command::SAVE_USERTEMPS` (110):
+  FREE_DATA / PREPARE_DATA / DATA×n / SAVE_USERTEMPS / REFRESH_DATA, transcribed
+  from fananimi/pyzk commit f29709c1.
+- `Packet::buildUserTemplatesUpload()`, `Packet::buildSaveUserTemplatesRequest()`,
+  `Packet::withUserId()` (rewrites only the 9-byte id field).
+- `UserCodec::rawRecord()`, `TemplateCodec::isEmptyTable()`.
+
+Capability levels unchanged: `user.renumber` and `template.upload` stay
+`not_implemented` in `defaults()` until a hardware run succeeds. Tests:
+`tests/Unit/UserReuploadTest.php` (wire bytes vs pyzk, real F18 fixture blobs,
+snapshot-before-write, refusal, dropped fingers, restore, failed restore).
+
+## 2.7.0 — 2026-09-23
+
+### Added — `UserService::renumber()` and `Capability::USER_RENUMBER` (EXPERIMENTAL)
+
+Moves a user to a different user id by rewriting the same uid, keeping name,
+privilege, card and — because templates are keyed by uid — fingerprints. Verified
+by read-back of both the user table and the template table; any lost finger, a
+second record, or a record on the wrong uid throws `VerificationException`.
+`user.renumber` is `implemented` in `CapabilitySet::defaults()` (never yet run on
+hardware), `not_implemented` for C3, and listed in `CapabilityResolver::unprobeable()`.
+Tests: `tests/Unit/UserRenumberTest.php` against a simulated terminal.
+
+## 2.6.0 — 2026-09-15
+
+### Added — the C3 write, delete and count command numbers (NOT yet sendable)
+
+- **`Command::SET_DATA = 0x07`, `DELETE_DATA = 0x09`, `GET_DATA_COUNT = 0x0A`**,
+  recovered from the vendor's own `plcommpro.dll`. **No public C3 reimplementation
+  has a write command at all** — `vwout/zkaccess-c3-py`'s command set stops at
+  `GET_DATA`, and its own README says the protocol is undocumented and everything
+  rests on reverse engineering. So this could not be transcribed from a reference;
+  it came out of the DLL.
+
+  The evidence is the SDK's own log string followed immediately by the constant it
+  sets:
+
+  ```
+  .rdata  "SetDeviceData, ZEMBPRO_SENDCMDDATA Before !Cmd=CMD_SET_DATA, datalen=%d"
+  .text   1000b7c2:  movl $0x7,0x44(%esp)      ; the command
+  .text   1000b7ca:  movl $0x8000,0x40(%esp)   ; the send buffer
+  ```
+
+  `0x09` sits inside `Process_DeleteDeviceData` and `0x0A` inside
+  `Process_GetDeviceDataCount`. The same extraction independently reproduces three
+  command numbers already known from the references — `0x03` DATETIME, `0x04`
+  GET_PARAM, `0x06` DATATABLE_CFG — which is what makes it a method rather than a
+  coincidence.
+
+### NOT added — the write itself
+
+- **The command number is settled. The PAYLOAD layout for a write is not.** The read
+  request is `[tableIndex][fieldCount][fieldIndexes…][0,0]` and the DLL is seen
+  tokenising the caller's field list on `','`, so a write almost certainly mirrors
+  it — but "almost certainly" is not a basis for sending bytes to a panel that holds
+  320 live enrolments and controls a door. A malformed write to `user` overwrites
+  people whose fingerprints cannot be restored from any backup.
+
+  Left as a **narrow, named gap** rather than guessed at, per the host app's rules 16
+  and 17. Closing it needs either a capture of ZKAccess 3.5.5 writing one user, or
+  more DLL work on the payload builder between `0x1000af68` and `0x1000b7c2`.
+
 ## 2.3.0 — 2026-09-14
 
 ### Fixed — a growing table no longer aborts a windowed read

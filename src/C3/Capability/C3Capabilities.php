@@ -63,6 +63,7 @@ final class C3Capabilities
             // Deliberately unbuilt. See the class note: known, not guessed at.
             Capability::USER_WRITE => Capability::NOT_IMPLEMENTED,
             Capability::USER_DELETE => Capability::NOT_IMPLEMENTED,
+            Capability::USER_RENUMBER => Capability::NOT_IMPLEMENTED,
             Capability::USER_DISABLE => Capability::NOT_IMPLEMENTED,
             Capability::CARD_WRITE => Capability::NOT_IMPLEMENTED,
             Capability::CARD_ENROLL => Capability::NOT_IMPLEMENTED,

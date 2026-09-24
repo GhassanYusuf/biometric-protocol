@@ -84,6 +84,17 @@ final class CapabilitySet
             Capability::TEMPLATE_DOWNLOAD => Capability::NOT_IMPLEMENTED,
             Capability::TEMPLATE_UPLOAD => Capability::NOT_IMPLEMENTED,
 
+            /*
+             * REFUSED BY THE F18 — observed 2026-09-23, IT Room @ 192.168.7.62, test user
+             * uid 6: rewriting the uid under a new user id answered ACK_ERROR for
+             * `000000005`, `5` and `10055`, record untouched each time (traces in the host app,
+             * tools/zkprobe/traces-2026-09-23/renumber-itroom-01.json). Leading zeros were
+             * therefore not the cause. UserService::renumber() stays for firmware that
+             * accepts it; the level hides it here. The only other route, delete and
+             * re-create, needs TEMPLATE_UPLOAD and would otherwise destroy fingerprints.
+             */
+            Capability::USER_RENUMBER => Capability::NOT_IMPLEMENTED,
+
             // Never probed. Access-control features may well exist on the hardware;
             // we have no evidence either way, so we claim nothing.
             Capability::VERIFY_MODE => Capability::UNKNOWN,

@@ -128,6 +128,7 @@ final class CapabilityResolver
         return [
             Capability::USER_WRITE => 'Would create or modify a real user record.',
             Capability::USER_DELETE => 'Would delete a real user.',
+            Capability::USER_RENUMBER => 'Would change the user id attendance is recorded under, and could cost fingerprints.',
             Capability::USER_DISABLE => 'Would clear a real card.',
             Capability::CARD_WRITE => 'Would overwrite a real card number.',
             Capability::CARD_ENROLL => 'Requires a physical card tap at the terminal.',

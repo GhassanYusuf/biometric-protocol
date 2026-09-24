@@ -174,6 +174,81 @@ final class Packet
     }
 
     /**
+     * A user record with only its user id replaced — every other byte (password,
+     * group, time zones, card, privilege, uid) exactly as the device had it.
+     *
+     * Patching the device's own record, rather than rebuilding one from decoded
+     * fields, is deliberate: UserCodec does not decode the password or the time-zone
+     * block, and a rebuilt record would silently reset them.
+     *
+     * Only the documented 9-byte id field at offset 48 is written. pyzk writes 24
+     * bytes there; bytes 57..71 have read as zero on every F18 record, but whether
+     * they are the id's tail is unresolved (docs/device-capabilities.md), so they are
+     * carried over as read rather than overwritten on a guess.
+     */
+    public static function withUserId(string $record, string $userId): string
+    {
+        if (strlen($record) !== 72) {
+            throw new \InvalidArgumentException('A user record is 72 bytes, got ' . strlen($record) . '.');
+        }
+        if (strlen($userId) < 1 || strlen($userId) > 9) {
+            throw new \InvalidArgumentException("A user id is 1 to 9 bytes, got '{$userId}'.");
+        }
+
+        return substr_replace($record, str_pad($userId, 9, "\0"), 48, 9);
+    }
+
+    /**
+     * The buffer SAVE_USERTEMPS commits: one user record plus their templates.
+     *
+     * TRANSCRIBED LITERALLY from fananimi/pyzk zk/base.py `HR_save_usertemplates`
+     * (commit f29709c1), so that a mismatch on hardware is a finding about the
+     * device and not about our arithmetic:
+     *
+     *   head   = pack("III", len(upack), len(table), len(fpack))    12 bytes
+     *   upack  = 0x02 + the 72-byte user record                      73 bytes (User.repack73)
+     *   table  = per template pack("<bHbI", 2, uid, 0x10 + fid, tstart)   8 bytes each
+     *   fpack  = per template pack("<H%is", len(template), template)
+     *
+     * `tstart` is the offset of that template inside fpack. pyzk writes 0x10 + slot
+     * and does NOT carry the record's `valid` byte; the meaning of 0x10 is not stated
+     * there. That is transcribed as-is and is one of the things the first hardware
+     * run must settle (docs/device-capabilities.md).
+     *
+     * EXPERIMENTAL — never run against hardware in this project.
+     *
+     * @param list<array{fid:int,template:string}> $templates
+     */
+    public static function buildUserTemplatesUpload(string $record, array $templates): string
+    {
+        if (strlen($record) !== 72) {
+            throw new \InvalidArgumentException('A user record is 72 bytes, got ' . strlen($record) . '.');
+        }
+
+        $uid = unpack('v', substr($record, 0, 2))[1];
+        $upack = "\x02" . $record;
+        $table = '';
+        $fpack = '';
+
+        foreach ($templates as $t) {
+            $fid = (int) $t['fid'];
+            if ($fid < 0 || $fid > 9) {
+                throw new \InvalidArgumentException("Finger slot must be 0-9, got {$fid}.");
+            }
+            $table .= pack('C', 2) . pack('v', $uid) . pack('C', 0x10 + $fid) . pack('V', strlen($fpack));
+            $fpack .= pack('v', strlen($t['template'])) . $t['template'];
+        }
+
+        return pack('V3', strlen($upack), strlen($table), strlen($fpack)) . $upack . $table . $fpack;
+    }
+
+    /** SAVE_USERTEMPS payload, transcribed from pyzk: pack('<IHH', 12, 0, 8). */
+    public static function buildSaveUserTemplatesRequest(): string
+    {
+        return pack('V', 12) . pack('v', 0) . pack('v', 8);
+    }
+
+    /**
      * Builds a 72-byte user record for USER_WRQ.
      *
      * Field layout per the documented ZK protocol (adrobinoga/zk-protocol, "Set

@@ -149,4 +149,107 @@ final class RecordCodec
 
         return $rows;
     }
+
+    /**
+     * Builds a SET_DATA payload: the mirror of decode() for writes.
+     *
+     * Wire shape per xub/zkaccess-c3-py `main` @ a6b7b92c (`set_user()`), which is the
+     * same record format decode() reads: `[table, field count, field ids...]`, then per
+     * row, per field, `<1-byte length><value>`. Integers little-endian in the fewest
+     * bytes, 0 as a single 0x00 (length 1); strings as their bytes, empty = length 0.
+     *
+     * FIELD IDS COME FROM THE PANEL'S OWN CATALOGUE, never from constants: the fork
+     * hard-codes user = CardNo 1, Pin 2..., while the TF1700 publishes UID 1, CardNo 2,
+     * Pin 3 (docs/device-capabilities.md). Only the fields named in $values are sent,
+     * in catalogue order.
+     *
+     * BLOB fields (fingerprint templates) are refused unless $allowBlobs — only
+     * Panel::moveUser() writes them, re-writing a person's OWN templates under a new
+     * Pin. A blob carries a TWO-byte length, as on the read side (decode()).
+     *
+     * EXPERIMENTAL. CONFIRMED for `user` / `userauthorize` rows on the TF1700
+     * (2026-09-24).
+     *
+     * @param array<string,array{index:int,type:string}> $fields   the table's catalogue entry
+     * @param list<array<string,int|string>>             $rows     field name => value
+     */
+    public static function encode(int $tableIndex, array $fields, array $rows, bool $allowBlobs = false): string
+    {
+        if ($rows === []) {
+            throw new \InvalidArgumentException('Nothing to write.');
+        }
+
+        $names = array_keys($rows[0]);
+        foreach ($rows as $row) {
+            if (array_keys($row) !== $names) {
+                throw new \InvalidArgumentException('Every row must carry the same fields in the same order.');
+            }
+        }
+
+        $send = [];
+        foreach ($names as $name) {
+            if (! isset($fields[$name])) {
+                throw new \InvalidArgumentException("This panel's table has no field '{$name}'.");
+            }
+            if ($fields[$name]['type'] === 'b' && ! $allowBlobs) {
+                throw new \InvalidArgumentException("Refusing to write blob field '{$name}'.");
+            }
+            $send[$name] = $fields[$name];
+        }
+        uasort($send, fn ($a, $b) => $a['index'] <=> $b['index']);
+
+        $out = pack('C*', $tableIndex, count($send), ...array_map(fn ($f) => $f['index'], array_values($send)));
+
+        foreach ($rows as $row) {
+            foreach ($send as $name => $meta) {
+                $out .= self::encodeValue($row[$name], $meta['type'], $name);
+            }
+        }
+
+        return $out;
+    }
+
+    /** DELETE_DATA payload: `[table, 1, key field id]` + `<len><value>` (same fork, delete_user()). */
+    public static function encodeDeleteKey(int $tableIndex, array $fields, string $keyField, int|string $value): string
+    {
+        if (! isset($fields[$keyField])) {
+            throw new \InvalidArgumentException("This panel's table has no field '{$keyField}'.");
+        }
+
+        return pack('C*', $tableIndex, 1, $fields[$keyField]['index'])
+            .self::encodeValue($value, $fields[$keyField]['type'], $keyField);
+    }
+
+    private static function encodeValue(int|string $value, string $type, string $name): string
+    {
+        if ($type === 'b') {
+            $bytes = (string) $value;
+            if (strlen($bytes) > 0xFFFF) {
+                throw new \InvalidArgumentException("Blob field '{$name}' is longer than 65535 bytes.");
+            }
+
+            return pack('v', strlen($bytes)).$bytes;
+        }
+
+        if ($type === 'i') {
+            $v = (int) $value;
+            if ($v < 0) {
+                throw new \InvalidArgumentException("Field '{$name}' cannot be negative.");
+            }
+            $bytes = '';
+            do {
+                $bytes .= chr($v & 0xFF);
+                $v >>= 8;
+            } while ($v > 0);
+
+            return chr(strlen($bytes)).$bytes;
+        }
+
+        $bytes = (string) $value;
+        if (strlen($bytes) > 255) {
+            throw new \InvalidArgumentException("Field '{$name}' is longer than 255 bytes.");
+        }
+
+        return chr(strlen($bytes)).$bytes;
+    }
 }

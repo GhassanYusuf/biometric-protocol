@@ -307,6 +307,63 @@ class DeviceClient
     }
 
     /**
+     * Writes one user record AND their fingerprint templates in a single commit.
+     *
+     * Sequence transcribed from fananimi/pyzk zk/base.py (commit f29709c1):
+     * `_send_with_buffer` (FREE_DATA, PREPARE_DATA with the uint32 size, then DATA
+     * in 1,024-byte chunks, each acknowledged) followed by SAVE_USERTEMPS and
+     * REFRESH_DATA. Run with the device disabled, as every write here is — that part
+     * is CONFIRMED necessary for USER_WRQ on the F18 and assumed to apply here.
+     *
+     * EXPERIMENTAL — never run against hardware in this project. Callers MUST read
+     * back: this reports what the device accepted, not what it kept.
+     *
+     * @param string                                  $record    72-byte user record
+     * @param list<array{fid:int,template:string}>    $templates
+     */
+    public function saveUserWithTemplates(string $record, array $templates): void
+    {
+        $buffer = Packet::buildUserTemplatesUpload($record, $templates);
+
+        $this->withDeviceDisabled(function () use ($buffer) {
+            $this->sendBuffer($buffer);
+
+            $reply = $this->send(Command::SAVE_USERTEMPS, Packet::buildSaveUserTemplatesRequest());
+
+            if (! $reply->isAccepted()) {
+                throw new ProtocolException("Device rejected the user+template save ({$reply->commandName()}).", [
+                    'bytes' => strlen($buffer),
+                ]);
+            }
+        });
+    }
+
+    /** pyzk `_send_with_buffer`: stage $buffer on the device for the next command. */
+    private function sendBuffer(string $buffer): void
+    {
+        // Clears any staged buffer. Not checked: with nothing staged some firmware
+        // answers ACK_ERROR, which says nothing about the upload that follows.
+        $this->send(Command::FREE_DATA);
+
+        $reply = $this->send(Command::PREPARE_DATA, pack('V', strlen($buffer)));
+        if (! $reply->isAccepted()) {
+            throw new ProtocolException("Device refused to prepare for {$reply->commandName()} upload.", [
+                'bytes' => strlen($buffer),
+            ]);
+        }
+
+        foreach (str_split($buffer, 1024) as $i => $chunk) {
+            $reply = $this->send(Command::DATA, $chunk);
+            if (! $reply->isAccepted()) {
+                throw new ProtocolException("Device refused upload chunk {$i} ({$reply->commandName()}).", [
+                    'bytes' => strlen($buffer),
+                    'chunk' => $i,
+                ]);
+            }
+        }
+    }
+
+    /**
      * Deletes ONE fingerprint template, keeping the user and their other fingers.
      *
      * EXPERIMENTAL: DELETE_USERTEMP with (uint16 uid, uint8 slot). The command and

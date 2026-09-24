@@ -316,24 +316,212 @@ final class Panel
      * @param  ?callable(\Promoseven\Biometric\Value\Progress):void  $onProgress
      * @return list<DeviceUser>
      */
-    public function readUsers(?callable $onProgress = null): array
+    public function readUsers(?callable $onProgress = null, bool $withFingerprints = false): array
     {
+        /*
+         * Finger slots come from templatev10, which is a SECOND table read. It used to
+         * be impossible here, so every C3 user came back with fingerSlots null — "not
+         * read" — and the roster rendered an amber "?" for all of them. It is possible
+         * now, so ask for it when the caller wants it.
+         *
+         * Still only on request: it is another full table transfer (281,680 bytes on
+         * these panels), and a caller that only wants the roster should not pay for it.
+         *
+         * A user absent from templatev10 while the table DID decode genuinely has no
+         * fingerprints — that is a real empty list, not "unknown" (rule 10).
+         */
+        $slotsByPin = null;
+
+        if ($withFingerprints) {
+            $slotsByPin = [];
+
+            foreach ($this->readTemplates() as $t) {
+                $pin = $t['user_id'];
+
+                if ($pin !== '' && ! in_array($t['fid'], $slotsByPin[$pin] ?? [], true)) {
+                    $slotsByPin[$pin][] = $t['fid'];
+                }
+            }
+
+            foreach ($slotsByPin as $pin => $slots) {
+                sort($slots);
+                $slotsByPin[$pin] = $slots;
+            }
+        }
+
         $users = [];
 
         foreach ($this->readTable('user', $onProgress) as $row) {
             $card = (int) ($row['CardNo'] ?? 0);
+            $pin = (string) ($row['Pin'] ?? '');
 
             $users[] = new DeviceUser(
                 uid: (int) ($row['UID'] ?? 0),
-                userId: (string) ($row['Pin'] ?? ''),
+                userId: $pin,
                 name: (string) ($row['Name'] ?? ''),
                 privilege: (int) ($row['Privilege'] ?? 0),
                 cardNumber: $card > 0 ? $card : null,
-                fingerSlots: null,
+                fingerSlots: $slotsByPin === null ? null : ($slotsByPin[$pin] ?? []),
             );
         }
 
         return $users;
+    }
+
+    /**
+     * Writes rows to a table (SET_DATA, 0x07). EXPERIMENTAL — not yet sent to any panel.
+     *
+     * Payload built from THIS panel's catalogue (RecordCodec::encode). Reports what the
+     * panel ACCEPTED only: callers must read the table back to confirm (rule 10).
+     *
+     * @param list<array<string,int|string>> $rows
+     */
+    public function writeRows(string $table, array $rows, bool $allowBlobs = false): void
+    {
+        $catalogue = $this->catalogue();
+        $payload = RecordCodec::encode($catalogue->indexOf($table), $catalogue->fields($table), $rows, $allowBlobs);
+
+        [$reply, $answer] = $this->command(Command::SET_DATA, $payload, 20.0);
+
+        if ($reply !== Command::REPLY_OK) {
+            throw $this->refusal("write to table '{$table}'", $reply, $answer);
+        }
+    }
+
+    /**
+     * Deletes the rows of a table whose $keyField equals $value (DELETE_DATA, 0x09).
+     * EXPERIMENTAL — not yet sent to any panel.
+     *
+     * The key field is NAMED and resolved through this panel's catalogue — a fork of
+     * the reference hard-codes id 2 as "Pin", which on the TF1700 is CardNo and would
+     * delete by card. Callers must read back and confirm exactly what went.
+     */
+    public function deleteRows(string $table, string $keyField, int|string $value): void
+    {
+        $catalogue = $this->catalogue();
+        $payload = RecordCodec::encodeDeleteKey($catalogue->indexOf($table), $catalogue->fields($table), $keyField, $value);
+
+        [$reply, $answer] = $this->command(Command::DELETE_DATA, $payload, 20.0);
+
+        if ($reply !== Command::REPLY_OK) {
+            throw $this->refusal("delete from table '{$table}'", $reply, $answer);
+        }
+    }
+
+    /**
+     * Moves one person from $fromPin to $toPin: their `user` row, their
+     * `userauthorize` (door x time-zone) rows and their `templatev10` (fingerprint)
+     * rows. EXPERIMENTAL.
+     *
+     * COPY, VERIFY, THEN REMOVE — never remove first:
+     *   1. `user` under the new Pin (UID not sent; the panel assigns a NEW one —
+     *      OBSERVED 287 -> 296 on the TF1700, 2026-09-24), read back;
+     *   2. `userauthorize` under the new Pin, read back;
+     *   3. `templatev10` under the new Pin AND the new UID (every template on the TF1700
+     *      carries its owner's UID — 238 of 238, 2026-09-24), read back and compared
+     *      byte for byte per finger;
+     *   4. only then the old Pin's templates, door rows and user row are deleted.
+     * A failure before step 4 removes whatever landed under the new Pin; the old rows
+     * were never touched, so the person keeps working under the old Pin.
+     *
+     * @return array<string,int> rows moved per table
+     */
+    public function moveUser(int $fromPin, int $toPin): array
+    {
+        $catalogue = $this->catalogue();
+        $tables = array_values(array_filter(['user', 'userauthorize', 'templatev10'], fn ($t) => $catalogue->has($t)));
+
+        $byPin = fn (string $table, int $pin) => array_values(array_filter(
+            $this->readTable($table),
+            fn ($r) => (int) ($r['Pin'] ?? -1) === $pin,
+        ));
+        $fingers = fn (array $rows) => array_combine(
+            array_map(fn ($r) => (int) $r['FingerID'], $rows),
+            array_map(fn ($r) => sha1((string) $r['Template']), $rows),
+        ) ?: [];
+
+        if ($fromPin === $toPin) {
+            throw new ProtocolException('Moving a user needs two different Pins.');
+        }
+        if ($byPin('user', $fromPin) === []) {
+            throw new ProtocolException("Pin {$fromPin} is not on this panel.");
+        }
+        foreach ($tables as $table) {
+            if ($byPin($table, $toPin) !== []) {
+                throw new ProtocolException("Pin {$toPin} is already used in '{$table}' on this panel.");
+            }
+        }
+
+        $old = [];
+        foreach ($tables as $table) {
+            $old[$table] = $byPin($table, $fromPin);
+        }
+
+        try {
+            // 1. user
+            $userRows = array_map(function (array $r) use ($toPin) {
+                unset($r['UID']);
+                $r['Pin'] = $toPin;
+
+                return $r;
+            }, $old['user']);
+            $this->writeRows('user', $userRows);
+            $newUser = $byPin('user', $toPin);
+            if (count($newUser) !== 1) {
+                throw new ProtocolException("The panel accepted the user under Pin {$toPin} but did not show it when read back.");
+            }
+            $newUid = (int) $newUser[0]['UID'];
+
+            // 2. door permissions
+            if (in_array('userauthorize', $tables, true) && $old['userauthorize'] !== []) {
+                $this->writeRows('userauthorize', array_map(fn ($r) => ['Pin' => $toPin] + $r, $old['userauthorize']));
+                if (count($byPin('userauthorize', $toPin)) !== count($old['userauthorize'])) {
+                    throw new ProtocolException("The panel accepted the door permissions under Pin {$toPin} but did not show them when read back.");
+                }
+            }
+
+            // 3. fingerprints, under the new Pin AND the new UID
+            if (in_array('templatev10', $tables, true) && $old['templatev10'] !== []) {
+                $this->writeRows('templatev10', array_map(function (array $r) use ($toPin, $newUid) {
+                    $r['Pin'] = $toPin;
+                    $r['UID'] = $newUid;
+
+                    return $r;
+                }, $old['templatev10']), allowBlobs: true);
+
+                $now = $byPin('templatev10', $toPin);
+                if ($fingers($now) != $fingers($old['templatev10'])) {
+                    throw new ProtocolException("The fingerprints under Pin {$toPin} do not match the originals when read back.");
+                }
+                foreach ($now as $r) {
+                    if ((int) $r['UID'] !== $newUid) {
+                        throw new ProtocolException("A fingerprint under Pin {$toPin} carries UID {$r['UID']}, not the new user's {$newUid}.");
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            foreach (array_reverse($tables) as $table) {
+                try {
+                    if ($byPin($table, $toPin) !== []) {
+                        $this->deleteRows($table, 'Pin', $toPin);
+                    }
+                } catch (\Throwable) {
+                }
+            }
+            throw new ProtocolException("Could not move Pin {$fromPin} to {$toPin}: {$e->getMessage()} Pin {$fromPin} was left as it was.");
+        }
+
+        // 4. Only now remove the old Pin — fingerprints and doors first, the user last.
+        foreach (array_reverse($tables) as $table) {
+            if ($old[$table] !== []) {
+                $this->deleteRows($table, 'Pin', $fromPin);
+                if ($byPin($table, $fromPin) !== []) {
+                    throw new ProtocolException("Pin {$toPin} is in place, but Pin {$fromPin} is still in '{$table}' after the delete. Remove it in ZKAccess.");
+                }
+            }
+        }
+
+        return array_combine($tables, array_map(fn ($t) => count($old[$t]), $tables));
     }
 
     /**
