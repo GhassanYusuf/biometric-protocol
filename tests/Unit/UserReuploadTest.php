@@ -217,6 +217,8 @@ final class ReuploadTerminal extends DeviceClient
     public array $templates = [];
 
     public bool $templateTableUnreadable = false;
+    /** The device answers the template read with nothing at all (an empty table). */
+    public bool $templateTableSendsNothing = false;
     /** A user id whose save is refused ('*' = every save). */
     public ?string $refuseSavesFor = null;
     /** A user id whose save is accepted but whose templates are dropped. */
@@ -259,6 +261,9 @@ final class ReuploadTerminal extends DeviceClient
     {
         if ($this->templateTableUnreadable) {
             return "\x10\x00";
+        }
+        if ($this->templateTableSendsNothing) {
+            return ''; // BulkReader's "nothing to send" — what an empty F18 table returns
         }
 
         $body = '';

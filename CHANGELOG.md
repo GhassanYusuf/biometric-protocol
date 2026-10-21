@@ -6,6 +6,25 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.16.1 — 2026-10-21
+
+### Fixed — an empty template table is "no fingers", not "unknown"
+
+- `UserService::all(withFingerprints: true)` reported every user's fingers as unknown
+  (`null`) whenever the template table decoded to no records — so a terminal holding
+  no fingerprints at all (wiped, or new) could never be given its first one: callers
+  rightly refuse to write fingers where they cannot read them. An empty table is now
+  `[]` for everyone; bytes that decode to nothing stay `null`.
+- Empty = what the device declares: `''` from the bulk reader (its own "nothing to
+  send") or a 4-byte length of 0. OBSERVED on the F18 IT-Office (192.168.7.64,
+  2026-10-21): the template read returned 0 bytes after a wipe; control Good Wheels
+  (F18/ID) 28,610 bytes, 33 templates (host app
+  `tools/zkprobe/traces-2026-10-21/empty-template-table-01.json`).
+- Re-confirmed read-only on Good Wheels (F18/ID), Camelot (F18) and On The Road (F22):
+  every user's finger slots identical to the host app's previous read.
+- Tests: `UserFingerSlotsTest` (empty as nothing, empty as a zero length, garbage,
+  fingers present).
+
 ## 2.16.0 — 2026-10-21
 
 ### Added — `device.wipe`, `UserService::deleteAll()`
