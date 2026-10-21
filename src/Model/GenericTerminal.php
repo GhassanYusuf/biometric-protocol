@@ -49,7 +49,7 @@ final class GenericTerminal implements TerminalModel
             Capability::USER_DISABLE, Capability::USER_PRIVILEGE, Capability::CARD_WRITE, Capability::CARD_ENROLL, Capability::PASSWORD_WRITE,
             Capability::FINGERPRINT_ENROLL, Capability::TEMPLATE_DELETE,
             Capability::TEMPLATE_UPLOAD, Capability::SET_TIME, Capability::ATTENDANCE_CLEAR,
-            Capability::RESTART,
+            Capability::RESTART, Capability::DEVICE_WIPE,
         ] as $write) {
             $levels[$write] = Capability::UNKNOWN;
         }

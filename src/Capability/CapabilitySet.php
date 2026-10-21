@@ -75,6 +75,13 @@ final class CapabilitySet
              */
             Capability::ATTENDANCE_CLEAR => Capability::IMPLEMENTED,
             /*
+             * DEVICE_WIPE (2.16.0): UserService::deleteAll() — every user removed by
+             * DELETE_USER (18, CONFIRMED on the F18), then the user table read back and
+             * required to be empty. Not CLEAR_DATA (14), which is only DOCUMENTED. Never
+             * run on hardware; first run planned on a test F18 (host app "IT-Office").
+             */
+            Capability::DEVICE_WIPE => Capability::IMPLEMENTED,
+            /*
              * USER_PRIVILEGE: UserService::save() with an explicit privilege (0 / 14),
              * read back. The F18 KEEPS a privilege through save() (observed on IT Room,
              * 2026-10-11) and a re-added user got 14 back. CHANGING one CONFIRMED on the

@@ -27,6 +27,8 @@ final class Capability
     public const GET_TIME = 'device.time.read';
     public const SET_TIME = 'device.time.write';
     public const RESTART = 'device.restart';
+    /** Empty the terminal of every user (2.16.0): UserService::deleteAll(). */
+    public const DEVICE_WIPE = 'device.wipe';
 
     // --- Users ---
     public const USER_READ = 'user.read';

@@ -76,6 +76,7 @@ final class C3Capabilities
             Capability::TEMPLATE_UPLOAD => Capability::NOT_IMPLEMENTED,
             Capability::TEMPLATE_SLOT_PROBE => Capability::NOT_IMPLEMENTED,
             Capability::ATTENDANCE_CLEAR => Capability::NOT_IMPLEMENTED,
+            Capability::DEVICE_WIPE => Capability::NOT_IMPLEMENTED,
             Capability::SET_TIME => Capability::NOT_IMPLEMENTED,
             Capability::RESTART => Capability::NOT_IMPLEMENTED,
 

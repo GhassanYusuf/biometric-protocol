@@ -35,6 +35,11 @@ afterwards (`clearAll($expectedRecords)`), sets a user's privilege with a read-b
 (`UserService::setPrivilege()`), and treats a 40-byte attendance record with an empty
 user id as undecodable.
 
+Since 2.16.0 `UserService::deleteAll()` empties a standalone terminal of users — one
+`DELETE_USER` per uid, then the user table read back empty — behind the new
+`device.wipe` capability: IMPLEMENTED on the F18 only, never yet run on hardware.
+Saving anything first is the caller's responsibility.
+
 > **Proprietary software.** Not open source. See [LICENSE](LICENSE) — possession
 > of a copy grants no licence to use it.
 

@@ -6,6 +6,22 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.16.0 — 2026-10-21
+
+### Added — `device.wipe`, `UserService::deleteAll()`
+
+- `Capability::DEVICE_WIPE` (`device.wipe`). F18 (`CapabilitySet::defaults()`):
+  IMPLEMENTED, never run on hardware. F22: UNKNOWN (rule 15 — not inherited from the
+  F18). `GenericTerminal`: UNKNOWN. C3 panels: NOT_IMPLEMENTED.
+- `UserService::deleteAll(): int` — every user removed by `DELETE_USER` (18, the per-user
+  delete CONFIRMED on the F18), then the user table read back and required empty
+  (`VerificationException` with `context()['remaining']` otherwise). Refuses before
+  deleting anything when any user record would not decode (no uid to address); a
+  refused delete mid-way reports `context()['deleted']`. `CLEAR_DATA` (14) is not used:
+  DOCUMENTED only, effect on this firmware never observed.
+- Tests: `UserDeleteAllTest` (in-memory terminal; the dropped-delete and refused-delete
+  cases; every model's level).
+
 ## 2.15.0 — 2026-10-20
 
 ### Changed — `password.write` CONFIRMED on all four models

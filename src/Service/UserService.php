@@ -494,6 +494,66 @@ final class UserService
     }
 
     /**
+     * Removes EVERY user from the terminal — records, templates, cards and passwords
+     * with them (2.16.0, DEVICE_WIPE). Returns how many were removed.
+     *
+     * One DELETE_USER (18) per uid, the per-user delete CONFIRMED on the F18, rather
+     * than CLEAR_DATA (14), which is only DOCUMENTED and would also take the punch log
+     * and settings with it. The table is then read back and must be empty: this
+     * firmware family ACKs writes it drops, so the acknowledgements prove nothing.
+     *
+     * Saving anything first is the CALLER's job — this deletes what it is told to.
+     *
+     * @throws ProtocolException     a delete was refused; the context says how many went
+     * @throws VerificationException the terminal still holds users after every delete
+     */
+    public function deleteAll(): int
+    {
+        $users = UserCodec::decode($this->client->readUsersRaw());
+
+        // A record that would not decode has no uid to address. Deleting the rest and
+        // then failing the read-back would leave the terminal half emptied: refuse first.
+        $undecodable = count(array_filter($users, static fn (array $u) => ! isset($u['uid'])));
+        if ($undecodable > 0) {
+            throw new ProtocolException(
+                "{$undecodable} of the terminal's " . count($users) . ' user records would not decode, so they cannot be addressed. Nothing was removed.',
+                ['undecodable' => $undecodable, 'total' => count($users)],
+            );
+        }
+
+        $deleted = 0;
+
+        foreach ($users as $user) {
+            try {
+                $this->client->deleteUser((int) $user['uid']);
+            } catch (ProtocolException $refused) {
+                throw new ProtocolException(
+                    "The device refused to remove user {$user['user_id']} ({$refused->getMessage()}) after {$deleted} of "
+                    . count($users) . ' were removed. Read the terminal\'s users before retrying.',
+                    ['deleted' => $deleted, 'total' => count($users), 'user_id' => $user['user_id']],
+                );
+            }
+            $deleted++;
+        }
+
+        $left = UserCodec::decode($this->client->readUsersRaw());
+        if ($left !== []) {
+            throw new VerificationException(
+                sprintf(
+                    'The device accepted %d deletes but still holds %d user(s) when read back (%s). Run the wipe again; '
+                    . 'if they persist the device may need a power cycle.',
+                    $deleted,
+                    count($left),
+                    implode(', ', array_slice(array_column($left, 'user_id'), 0, 10)),
+                ),
+                ['deleted' => $deleted, 'remaining' => array_column($left, 'user_id')],
+            );
+        }
+
+        return $deleted;
+    }
+
+    /**
      * Deletes a user entirely — record, templates and card together.
      *
      * Confirms by reading back, for the same reason as save().

@@ -99,6 +99,8 @@ final class F22 implements TerminalModel
             // Never run on any model (2.14.0); the F22 claims nothing the F18 has not
             // even shown. Set on its own once it has run here.
             Capability::ATTENDANCE_CLEAR => Capability::UNKNOWN,
+            // A wipe is F18-first (2.16.0) and has never run on an F22 (rule 15).
+            Capability::DEVICE_WIPE => Capability::UNKNOWN,
             /*
              * USER_PRIVILEGE: UNKNOWN until 2.15.0, now IMPLEMENTED — the F18's
              * UserService::setPrivilege() on the same USER_WRQ record, whose password

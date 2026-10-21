@@ -222,6 +222,9 @@ final class ReuploadTerminal extends DeviceClient
     /** A user id whose save is accepted but whose templates are dropped. */
     public ?string $dropTemplatesFor = null;
     public int $writes = 0;
+    /** deleteAll(): every DELETE_USER refused, or one uid's delete ACKed and dropped. */
+    public bool $refuseDeletes = false;
+    public ?int $ignoreDeleteOfUid = null;
 
     public function __construct()
     {
@@ -269,6 +272,12 @@ final class ReuploadTerminal extends DeviceClient
     public function deleteUser(int $uid): void
     {
         $this->writes++;
+        if ($this->refuseDeletes) {
+            throw new ProtocolException('Device rejected the delete (ACK_ERROR).');
+        }
+        if ($this->ignoreDeleteOfUid === $uid) {
+            return; // ACKed, dropped — the firmware family's known failure
+        }
         unset($this->records[$uid]);
         $this->templates = array_values(array_filter($this->templates, fn ($t) => $t[0] !== $uid));
     }
