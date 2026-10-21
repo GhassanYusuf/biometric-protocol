@@ -6,6 +6,24 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.16.2 — 2026-10-21
+
+### Fixed — the first finger on an empty terminal could not be WRITTEN
+
+- 2.16.1 fixed the read; the write still refused. `TemplateService::addTemplates()`
+  reads the table first so it never overwrites a finger, and asked
+  `TemplateCodec::isEmptyTable()`, which knew only the 4-byte zero header — so the
+  0-byte reply of an empty F18 table read as "would not decode" and the write threw
+  `UnsupportedCommandException`. Observed: Ghassan pushed to the F18 IT-Office
+  (192.168.7.64) — card written, no finger.
+- `TemplateCodec::isEmptyTable()` now also accepts no bytes at all, and is the ONE
+  definition: `UserService::all()` (2.16.1's own check) uses it too, as do the two ID-move
+  paths. Reproduced in a second read-only run (host app
+  `tools/zkprobe/traces-2026-10-21/empty-template-table-02.json`): IT-Office 0 bytes,
+  empty; Good Wheels, Camelot (F18) and On The Road (F22) non-empty and unchanged.
+- Tests: `TemplateAddTest::test_writes_the_first_finger_on_a_terminal_whose_empty_table_is_sent_as_nothing`,
+  `TemplateCodecTest::test_an_empty_table_is_a_zero_header_or_no_bytes_and_nothing_else`.
+
 ## 2.16.1 — 2026-10-21
 
 ### Fixed — an empty template table is "no fingers", not "unknown"

@@ -137,14 +137,23 @@ final class TemplateCodec
     }
 
     /**
-     * True only for a table that decoded and genuinely holds no templates: the
-     * 4-byte header says zero and nothing follows. decode() returns [] for that AND
-     * for an undecodable buffer; a caller that must tell "nobody has fingers" from
-     * "could not read" asks this.
+     * True only for a table the device DECLARED empty. decode() returns [] for that
+     * AND for an undecodable buffer; a caller that must tell "nobody has fingers" from
+     * "could not read" asks this — the ONE definition, used by every read and write.
+     *
+     * Two forms (2.16.2):
+     *   - a 4-byte header that says zero, nothing following;
+     *   - NO BYTES AT ALL — BulkReader returns '' only for the device's own "nothing to
+     *     send" (ACK_OK with no data, or a declared size of 0); a failed transfer
+     *     throws. OBSERVED on the F18 IT-Office (192.168.7.64, 2026-10-21) after a
+     *     wipe: the template read returned 0 bytes. Until 2.16.2 that read as
+     *     undecodable, so addTemplates() refused to write a wiped or new terminal's
+     *     first finger (host app casebook DC-027,
+     *     tools/zkprobe/traces-2026-10-21/empty-template-table-01.json).
      */
     public static function isEmptyTable(string $raw): bool
     {
-        return strlen($raw) === 4 && unpack('V', $raw)[1] === 0;
+        return $raw === '' || (strlen($raw) === 4 && unpack('V', $raw)[1] === 0);
     }
 
     /**

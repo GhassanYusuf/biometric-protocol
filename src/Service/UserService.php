@@ -55,18 +55,9 @@ final class UserService
         $tableEmpty = false;
         if ($withFingerprints) {
             $rawTemplates = $this->client->readTemplatesRaw();
-            /*
-             * An EMPTY template table is a real answer, not "unknown" (2.16.1). The
-             * device declares it: BulkReader returns '' only for its own "nothing to
-             * send" (ACK_OK with no data, or a declared size of 0), and a 4-byte length
-             * of 0 says the same. Until 2.16.1 an empty table read as unknown for every
-             * user, so a wiped or new terminal could never be given its first finger —
-             * IT-Office (F18, 192.168.7.64) after its wipe, 2026-10-21: 0 bytes returned
-             * (host app tools/zkprobe/traces-2026-10-21/empty-template-table-01.json).
-             * Bytes that decode to no records stay unknown, as before.
-             */
-            $tableEmpty = $rawTemplates === ''
-                || (strlen($rawTemplates) === 4 && unpack('V', $rawTemplates)[1] === 0);
+            // An EMPTY table is a real "no fingers" for everyone, not "unknown" (2.16.1);
+            // what counts as empty is TemplateCodec::isEmptyTable()'s, nobody else's.
+            $tableEmpty = TemplateCodec::isEmptyTable($rawTemplates);
             $slotsByUserId = TemplateCodec::slotsByUserId(TemplateCodec::decode($rawTemplates), $records);
         }
 

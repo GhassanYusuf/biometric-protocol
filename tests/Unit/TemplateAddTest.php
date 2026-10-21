@@ -44,6 +44,23 @@ final class TemplateAddTest extends TestCase
         $this->assertSame($recordBefore, $t->records[20], 'the device\'s own record is written back unchanged');
     }
 
+    /**
+     * DC-027 (2026-10-21): the first finger on a terminal that holds none. IT-Office
+     * answered its empty template table with no bytes, and the write refused it as
+     * "would not decode" — so a wiped or new terminal could never be given a finger.
+     */
+    public function test_writes_the_first_finger_on_a_terminal_whose_empty_table_is_sent_as_nothing(): void
+    {
+        $t = new AddTerminal();
+        $t->emptyTableSendsNothing = true;
+        $t->addUser(1, '830108246', 'Ghassan', 7566580);
+
+        $written = (new TemplateService($t))->addTemplates('830108246', [['fid' => 3, 'template' => 'G3'], ['fid' => 6, 'template' => 'G6']]);
+
+        $this->assertSame([3, 6], $written);
+        $this->assertSame([[1, 3, 'G3'], [1, 6, 'G6']], $t->sortedTemplates());
+    }
+
     public function test_never_overwrites_a_slot_the_user_already_fills(): void
     {
         $t = new AddTerminal();
@@ -145,6 +162,8 @@ final class AddTerminal extends DeviceClient
     /** @var list<array{0:int,1:int,2:string}> */
     public array $templates = [];
     public bool $templateTableUnreadable = false;
+    /** An empty table is sent as no bytes at all, as the F18 IT-Office did (2026-10-21). */
+    public bool $emptyTableSendsNothing = false;
     /** SAVE_USERTEMPS replaces the user's whole template set (otherwise it merges per slot). */
     public bool $replacesSet = false;
     /** Accepts the save but keeps none of the slots the user did not already have. */
@@ -181,6 +200,9 @@ final class AddTerminal extends DeviceClient
     {
         if ($this->templateTableUnreadable) {
             return "\x10\x00";
+        }
+        if ($this->emptyTableSendsNothing && $this->templates === []) {
+            return '';
         }
 
         $body = '';

@@ -240,4 +240,13 @@ class TemplateCodecTest extends TestCase
         $this->assertSame([3], $slots['1001']);
         $this->assertSame([], $slots['1002']);
     }
+
+    /** The one definition of an empty table (2.16.2): a zero header, or no bytes at all. */
+    public function test_an_empty_table_is_a_zero_header_or_no_bytes_and_nothing_else(): void
+    {
+        $this->assertTrue(\Promoseven\Biometric\Codec\TemplateCodec::isEmptyTable(''));
+        $this->assertTrue(\Promoseven\Biometric\Codec\TemplateCodec::isEmptyTable(pack('V', 0)));
+        $this->assertFalse(\Promoseven\Biometric\Codec\TemplateCodec::isEmptyTable("\x10\x00"), 'stray bytes are unreadable, not empty');
+        $this->assertFalse(\Promoseven\Biometric\Codec\TemplateCodec::isEmptyTable(pack('V', 12) . str_repeat("\0", 12)));
+    }
 }
