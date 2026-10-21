@@ -14,6 +14,8 @@ namespace Promoseven\Biometric\Service;
 
 use Promoseven\Biometric\Client\DeviceClient;
 use Promoseven\Biometric\Codec\AttendanceCodec;
+use Promoseven\Biometric\Exception\ProtocolException;
+use Promoseven\Biometric\Exception\VerificationException;
 
 /**
  * Attendance records on the device.
@@ -156,9 +158,56 @@ final class AttendanceService
      * Only call this after confirming the records are safely imported, and never
      * automatically — a device whose log is cleared before a failed import has lost
      * that attendance permanently.
+     *
+     * $expectedRecords (2.14.0) is how many records the caller has stored. The
+     * terminal's own count (GET_FREE_SIZES) is read in this same session immediately
+     * before the clear, and the clear is REFUSED, nothing sent, when it differs — a
+     * punch made after the caller's read would otherwise be destroyed unread. Pass
+     * null only when the caller has some other proof.
+     *
+     * Not trusted on the ACK (this firmware ACKs writes it drops): the count is read
+     * again afterwards and must be 0, or VerificationException.
+     *
+     * IMPLEMENTED — written 2026-10-18, never run on hardware. Returns the number of
+     * records the terminal held before the clear.
      */
-    public function clearAll(): void
+    public function clearAll(?int $expectedRecords = null): int
     {
+        $before = $this->client->recordCounts();
+
+        if ($expectedRecords !== null) {
+            if ($before === null) {
+                throw new ProtocolException('Refusing to clear attendance: the device did not report how many records it holds.');
+            }
+
+            if ($before['records'] !== $expectedRecords) {
+                throw new ProtocolException(
+                    "Refusing to clear attendance: the device holds {$before['records']} records, "
+                    ."the caller stored {$expectedRecords}. Read again first."
+                );
+            }
+        }
+
         $this->client->clearAttendanceLog();
+
+        $after = $this->client->recordCounts();
+
+        if ($after === null || $after['records'] !== 0) {
+            throw new VerificationException(
+                'The device acknowledged the attendance clear but still reports '
+                .($after === null ? 'an unreadable count' : "{$after['records']} records").'.'
+            );
+        }
+
+        return $before['records'] ?? $expectedRecords ?? 0;
+    }
+
+    /**
+     * How many attendance records the terminal says it holds, without transferring
+     * them (GET_FREE_SIZES). Null when the reply does not decode — never a guessed 0.
+     */
+    public function deviceCount(): ?int
+    {
+        return $this->client->recordCounts()['records'] ?? null;
     }
 }

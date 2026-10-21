@@ -29,7 +29,18 @@ final class DeviceUser
         public readonly ?int $cardNumber = null,
         /** Filled finger slots, or null when the template table could not be read. */
         public readonly ?array $fingerSlots = null,
+        /**
+         * The keypad password: '' when the device holds none, null when this read did
+         * not carry the field (2.13.0). A door credential — deliberately left out of
+         * toArray(), which says only whether there is one.
+         */
+        public readonly ?string $password = null,
     ) {
+    }
+
+    public function hasPassword(): ?bool
+    {
+        return $this->password === null ? null : $this->password !== '';
     }
 
     /** @param array<string,mixed> $record decoded by UserCodec */
@@ -44,6 +55,7 @@ final class DeviceUser
             privilege: (int) ($record['privilege'] ?? 0),
             cardNumber: $card > 0 ? $card : null,
             fingerSlots: $fingerSlots,
+            password: array_key_exists('password', $record) ? (string) $record['password'] : null,
         );
     }
 
@@ -82,6 +94,7 @@ final class DeviceUser
             'card_suspect' => $this->cardLooksLikeSentinel(),
             'finger_slots' => $this->fingerSlots,
             'fingerprint_count' => $this->fingerprintCount(),
+            'has_password' => $this->hasPassword(),
         ];
     }
 }

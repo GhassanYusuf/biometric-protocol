@@ -122,6 +122,9 @@ final class UserRenumberTest extends TestCase
  */
 final class RenumberTerminal extends DeviceClient
 {
+    public bool $dropPasswords = false;
+    public bool $dropPrivileges = false;
+
     /** @var array<int, array{user_id:string,name:string,privilege:int,card:int}> keyed by uid */
     public array $users = [];
 
@@ -142,7 +145,7 @@ final class RenumberTerminal extends DeviceClient
     {
         $body = '';
         foreach ($this->users as $uid => $u) {
-            $body .= Packet::buildUserRecord($uid, $u['user_id'], $u['name'], $u['privilege'], $u['card']);
+            $body .= Packet::buildUserRecord($uid, $u['user_id'], $u['name'], $u['privilege'], $u['card'], 1, $u['password'] ?? '');
         }
 
         return pack('V', strlen($body)) . $body;
@@ -163,7 +166,7 @@ final class RenumberTerminal extends DeviceClient
         return pack('V', strlen($body)) . $body;
     }
 
-    public function writeUser(int $uid, string $userId, string $name, int $privilege = 0, int $cardNumber = 0): void
+    public function writeUser(int $uid, string $userId, string $name, int $privilege = 0, int $cardNumber = 0, string $password = ''): void
     {
         $this->writes++;
 
@@ -175,7 +178,17 @@ final class RenumberTerminal extends DeviceClient
             $uid = max(array_keys($this->users)) + 1;
         }
 
-        $this->users[$uid] = ['user_id' => $userId, 'name' => $name, 'privilege' => $privilege, 'card' => $cardNumber];
+        // A firmware that accepts the record but ignores the password field.
+        if ($this->dropPasswords) {
+            $password = '';
+        }
+
+        // A firmware that accepts the record but keeps the privilege it had.
+        if ($this->dropPrivileges && isset($this->users[$uid])) {
+            $privilege = $this->users[$uid]['privilege'];
+        }
+
+        $this->users[$uid] = ['user_id' => $userId, 'name' => $name, 'privilege' => $privilege, 'card' => $cardNumber, 'password' => $password];
 
         if ($this->dropTemplatesOnWrite) {
             $this->templates = array_values(array_filter($this->templates, fn ($t) => $t[0] !== $uid));

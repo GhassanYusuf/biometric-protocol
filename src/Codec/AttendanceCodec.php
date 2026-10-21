@@ -83,6 +83,20 @@ final class AttendanceCodec
             return null;
         }
 
+        /*
+         * A punch always carries a user id. A blank one means the 40 bytes are not a
+         * record at all — the stream is misaligned. OBSERVED 2026-10-18 on Camelot
+         * (F18, 87.237.196.60, internet link): 2,876 such "records" had passed this
+         * decoder with stamps from 1999 to 2030, while the undecodable records of the
+         * same read showed the next record starting part-way through the chunk. No
+         * blank user id has ever been read from the LAN F18s or the F22. 2.14.0.
+         */
+        $userId = RecordBuffer::cString(substr($chunk, 2, 24));
+
+        if ($userId === '') {
+            return null;
+        }
+
         $decoded = Timestamp::decode(unpack('V', substr($chunk, 27, 4))[1], $timezone);
 
         if ($decoded === null) {
@@ -91,7 +105,7 @@ final class AttendanceCodec
 
         return [
             'uid' => unpack('v', substr($chunk, 0, 2))[1],
-            'user_id' => RecordBuffer::cString(substr($chunk, 2, 24)),
+            'user_id' => $userId,
             'status' => ord($chunk[31]),
             'verify_method' => ord($chunk[26]),
             'timestamp' => $decoded,

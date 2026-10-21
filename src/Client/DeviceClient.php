@@ -12,6 +12,7 @@
 
 namespace Promoseven\Biometric\Client;
 
+use Promoseven\Biometric\Codec\FreeSizesCodec;
 use Promoseven\Biometric\Codec\RecordBuffer;
 use Promoseven\Biometric\Codec\Timestamp;
 use Promoseven\Biometric\Exception\ConnectionException;
@@ -187,6 +188,18 @@ class DeviceClient
     }
 
     /**
+     * The terminal's own counts of users, fingerprints and attendance records, from
+     * CMD_GET_FREE_SIZES — no table is transferred. Null when the reply does not
+     * decode. CONFIRMED on the F18 and F22, see FreeSizesCodec.
+     *
+     * @return array{users:int,fingers:int,records:int,cards:int,fingers_capacity:int,users_capacity:int,records_capacity:int}|null
+     */
+    public function recordCounts(): ?array
+    {
+        return FreeSizesCodec::decode($this->send(Command::GET_FREE_SIZES)->data);
+    }
+
+    /**
      * Reads one named device parameter via CMD_DEVICE.
      *
      * The device answers "Name=Value"; we return just the value.
@@ -276,11 +289,12 @@ class DeviceClient
         string $name,
         int $privilege = 0,
         int $cardNumber = 0,
+        string $password = '',
     ): void {
-        $this->withDeviceDisabled(function () use ($uid, $userId, $name, $privilege, $cardNumber) {
+        $this->withDeviceDisabled(function () use ($uid, $userId, $name, $privilege, $cardNumber, $password) {
             $reply = $this->send(
                 Command::USER_WRQ,
-                Packet::buildUserRecord($uid, $userId, $name, $privilege, $cardNumber),
+                Packet::buildUserRecord($uid, $userId, $name, $privilege, $cardNumber, 1, $password),
             );
 
             if (! $reply->isAccepted()) {

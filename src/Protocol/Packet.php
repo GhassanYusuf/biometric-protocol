@@ -257,6 +257,11 @@ final class Packet
      * user id(9)@48, zeros(15)@57.
      *
      * CONFIRMED: group must be >= 1 — the device rejects writes with group 0.
+     *
+     * Password: up to 8 bytes at offset 3, NUL-padded. The READ of that field is
+     * CONFIRMED on the F18 and the F22 (2026-10-12,
+     * tools/zkprobe/user-passwords.php: every password the host app held equalled the
+     * terminal's). The WRITE is EXPERIMENTAL until a write probe reads it back.
      */
     public static function buildUserRecord(
         int $uid,
@@ -265,10 +270,18 @@ final class Packet
         int $privilege = 0,
         int $cardNumber = 0,
         int $group = 1,
+        string $password = '',
     ): string {
+        if (strlen($password) > 8) {
+            throw new \InvalidArgumentException('A keypad password is at most 8 bytes.');
+        }
+
         $record = str_repeat("\0", 72);
         $record = substr_replace($record, pack('v', $uid), 0, 2);
         $record = substr_replace($record, chr($privilege & 0xFF), 2, 1);
+        // password(8)@3. Until 2.13.0 this was always left zero, so every write erased
+        // the password a person had set at the terminal keypad.
+        $record = substr_replace($record, str_pad($password, 8, "\0"), 3, 8);
         $record = substr_replace($record, str_pad(substr($name, 0, 24), 24, "\0"), 11, 24);
         $record = substr_replace($record, pack('V', $cardNumber), 35, 4);
         $record = substr_replace($record, chr($group & 0xFF), 39, 1);

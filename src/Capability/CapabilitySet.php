@@ -51,12 +51,39 @@ final class CapabilitySet
             Capability::TEMPLATE_SLOT_PROBE => Capability::CONFIRMED,
             Capability::ATTENDANCE_READ => Capability::CONFIRMED,
 
+            /*
+             * Keypad password, password(8)@3 (2.13.0). READ CONFIRMED on the F18 —
+             * IT ROOM 192.168.7.62 and Camelot 87.237.196.60, 2026-10-12
+             * (tools/zkprobe/traces-2026-10-12/user-passwords-02.json): each password the
+             * host app held equalled the terminal's. WRITE CONFIRMED on the F18 2026-10-20
+             * (2.15.0): a test user's password written and read back, twice, and kept
+             * through a name write, on all three F18s — IT ROOM 192.168.7.62, Camelot
+             * 87.237.196.60 and Good Wheels 46.184.163.106 (F18/ID, 2021 firmware)
+             * (host app tools/zkprobe/traces-2026-10-20/user-password-write-01..04.json).
+             */
+            Capability::PASSWORD_READ => Capability::CONFIRMED,
+            Capability::PASSWORD_WRITE => Capability::CONFIRMED,
+
             // Implemented, never confirmed succeeding on hardware.
             Capability::SET_TIME => Capability::IMPLEMENTED,
             Capability::TEMPLATE_DELETE => Capability::IMPLEMENTED,
             Capability::CARD_ENROLL => Capability::IMPLEMENTED,
             Capability::ATTENDANCE_REALTIME => Capability::IMPLEMENTED,
+            /*
+             * ATTENDANCE_CLEAR: AttendanceService::clearAll(), guarded since 2.14.0 by the
+             * terminal's own record count before and after. Never run on hardware.
+             */
             Capability::ATTENDANCE_CLEAR => Capability::IMPLEMENTED,
+            /*
+             * USER_PRIVILEGE: UserService::save() with an explicit privilege (0 / 14),
+             * read back. The F18 KEEPS a privilege through save() (observed on IT Room,
+             * 2026-10-11) and a re-added user got 14 back. CHANGING one CONFIRMED on the
+             * F18 2026-10-20 (2.15.0): a test user made 14 then 0, each read back, name
+             * and password kept, everyone else unchanged — twice on IT ROOM, Camelot and
+             * Good Wheels (host app tools/zkprobe/traces-2026-10-20/
+             * user-privilege-write-01.json, -02.json).
+             */
+            Capability::USER_PRIVILEGE => Capability::CONFIRMED,
             Capability::RESTART => Capability::IMPLEMENTED,
             // Approximated by clearing the card — the protocol has no suspend flag.
             Capability::USER_DISABLE => Capability::IMPLEMENTED,
@@ -74,15 +101,21 @@ final class CapabilitySet
             Capability::TEMPLATE_BLOB_READ => Capability::CONFIRMED,
 
             /*
-             * Still not done, and the distinction matters. TEMPLATE_DOWNLOAD is the
-             * per-slot command; TEMPLATE_UPLOAD is writing a template BACK, which is
-             * the genuinely unverified half — the blob's internal format and the
-             * matching write command are both unproven, and a template that appears to
-             * save and then fails to match a real finger is worse than no feature.
-             * Reading the table (above) was never blocked by either.
+             * TEMPLATE_DOWNLOAD is the per-slot command and is still not done; the
+             * blobs come from the table instead (TEMPLATE_BLOB_READ above).
+             *
+             * TEMPLATE_UPLOAD = TemplateService::addTemplates() (SAVE_USERTEMPS, 2.10.0).
+             * WRITE + READ-BACK OBSERVED on the ZKTeco F18 @ 192.168.7.62 (IT Room),
+             * 2026-10-11: user 440105943 (uid 20, no fingers) was given slot 6 — a
+             * 1,132-byte template read off the inBIO460 — and the table then held it
+             * byte-identical; the other 17 users and 15 templates were unchanged.
+             * IMPLEMENTED, not CONFIRMED, until that finger has MATCHED at the
+             * terminal: a template that saves and does not match is the failure this
+             * level exists to warn about. Never run on the F22, which inherits this
+             * set — unknown there (rule 15).
              */
             Capability::TEMPLATE_DOWNLOAD => Capability::NOT_IMPLEMENTED,
-            Capability::TEMPLATE_UPLOAD => Capability::NOT_IMPLEMENTED,
+            Capability::TEMPLATE_UPLOAD => Capability::IMPLEMENTED,
 
             /*
              * REFUSED BY THE F18 — observed 2026-09-23, IT Room @ 192.168.7.62, test user

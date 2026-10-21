@@ -30,6 +30,10 @@ use Promoseven\Biometric\Value\DeviceUser;
  */
 final class UserService
 {
+    /** ZKTeco standalone privilege values: a normal user, and an administrator. */
+    public const PRIVILEGE_USER = 0;
+    public const PRIVILEGE_ADMIN = 14;
+
     public function __construct(private readonly DeviceClient $client)
     {
     }
@@ -103,6 +107,7 @@ final class UserService
         string $name,
         ?int $privilege = null,
         ?int $cardNumber = null,
+        ?string $password = null,
     ): DeviceUser {
         $records = UserCodec::decode($this->client->readUsersRaw());
         $existing = UserCodec::find($records, $userId);
@@ -110,8 +115,15 @@ final class UserService
         $uid = $existing['uid'] ?? UserCodec::nextFreeUid($records);
         $keepPrivilege = $privilege ?? (int) ($existing['privilege'] ?? 0);
         $keepCard = $cardNumber ?? (int) ($existing['card_number'] ?? 0);
+        /*
+         * The keypad password, kept like the card (2.13.0). Before this the record was
+         * rebuilt with it zeroed, so every name push and card write ERASED a password
+         * set at the terminal — OBSERVED 2026-10-12: IT ROOM (F18) lacked one the host
+         * app still held. Null keeps the device's; '' clears it.
+         */
+        $keepPassword = $password ?? (string) ($existing['password'] ?? '');
 
-        $this->client->writeUser($uid, $userId, $name, $keepPrivilege, $keepCard);
+        $this->client->writeUser($uid, $userId, $name, $keepPrivilege, $keepCard, $keepPassword);
 
         $confirmed = UserCodec::find(UserCodec::decode($this->client->readUsersRaw()), $userId);
 
@@ -123,7 +135,47 @@ final class UserService
             );
         }
 
+        // Never the value in the message: it is a door credential.
+        if (($confirmed['password'] ?? '') !== $keepPassword) {
+            throw new VerificationException(
+                "The device accepted the write for {$userId} but its keypad password does not read back as written.",
+                ['user_id' => $userId, 'uid' => $uid],
+            );
+        }
+
         return DeviceUser::fromRecord($confirmed);
+    }
+
+    /**
+     * Sets an EXISTING user's privilege — 0 normal user, 14 administrator (may open
+     * the terminal's menu) — keeping name, card and keypad password, then confirms the
+     * privilege on read-back: save() itself only checks the record and the password.
+     *
+     * IMPLEMENTED 2.14.0, never run on hardware (Capability::USER_PRIVILEGE). Refuses a
+     * user that is not on the device rather than creating one.
+     */
+    public function setPrivilege(string $userId, int $privilege): DeviceUser
+    {
+        if (! in_array($privilege, [self::PRIVILEGE_USER, self::PRIVILEGE_ADMIN], true)) {
+            throw new ProtocolException("Privilege {$privilege} is not one this library writes (0 or 14).", ['user_id' => $userId]);
+        }
+
+        $existing = UserCodec::find(UserCodec::decode($this->client->readUsersRaw()), $userId);
+
+        if ($existing === null) {
+            throw new ProtocolException("User {$userId} is not on the device.", ['user_id' => $userId]);
+        }
+
+        $user = $this->save($userId, (string) $existing['name'], $privilege);
+
+        if ($user->privilege !== $privilege) {
+            throw new VerificationException(
+                "The device accepted the privilege change for {$userId} but reads back {$user->privilege}, not {$privilege}.",
+                ['user_id' => $userId, 'uid' => $user->uid],
+            );
+        }
+
+        return $user;
     }
 
     /**

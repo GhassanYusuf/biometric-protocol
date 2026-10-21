@@ -79,6 +79,41 @@ final class Tf1700 implements PanelModel
              */
             Capability::TEMPLATE_TABLE_READ => Capability::CONFIRMED,
             Capability::TEMPLATE_BLOB_READ => Capability::CONFIRMED,
+
+            /*
+             * IMPLEMENTED 2026-09-24 (C3\Service\Personnel), offered with a warning.
+             * What is proven on this panel (192.168.7.60, test user, 2026-09-24): SET_DATA adds a
+             * user row, DELETE_DATA removes it, and templatev10 rows written under the
+             * panel's UID read back byte-identical (traces-2026-09-24/c3-user-move-*).
+             * NOT yet seen here: an edit of an existing row (SET_DATA as an update), a
+             * card write, and a finger enrolled elsewhere matching at this panel.
+             * Promote each to CONFIRMED only after tools/zkprobe/c3-personnel.php has run
+             * on THIS model — a TF1700 result says nothing about an inBIO460 (rule 15).
+             */
+            Capability::USER_WRITE => Capability::IMPLEMENTED,
+            Capability::USER_DELETE => Capability::IMPLEMENTED,
+            Capability::CARD_WRITE => Capability::IMPLEMENTED,
+
+            /*
+             * Keypad password, the user table's Password field (2.13.0). READ CONFIRMED on
+             * this model 2026-10-12 — Entrance 192.168.7.60: all 4 passwords the host app held
+             * equalled the panel's (traces-2026-10-12/user-passwords-02.json). WRITE
+             * (Personnel::add/update) CONFIRMED 2026-10-20 (2.15.0) — Entrance: a test
+             * user's password written and read back, twice, and kept through a name
+             * write; 315 users before and after (traces-2026-10-20/
+             * user-password-write-05.json, -06.json).
+             */
+            Capability::PASSWORD_READ => Capability::CONFIRMED,
+            Capability::PASSWORD_WRITE => Capability::CONFIRMED,
+            Capability::TEMPLATE_UPLOAD => Capability::IMPLEMENTED,
+
+            /*
+             * Clock, CONFIRMED on this panel 2026-10-11 (192.168.7.60): GET_PARAM "DateTime"
+             * read it 649 s slow; DATETIME (0x03) "DateTime=<packed>" (transcribed from
+             * vwout/zkaccess-c3-py) set it, and a separate read showed it exact.
+             */
+            Capability::GET_TIME => Capability::CONFIRMED,
+            Capability::SET_TIME => Capability::CONFIRMED,
         ]);
     }
 

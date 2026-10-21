@@ -158,10 +158,15 @@ final class Device
         return $this->capabilities ??= CapabilitySet::defaults();
     }
 
-    /** Probes the device read-only and caches the refined capability set. */
-    public function probeCapabilities(): CapabilitySet
+    /**
+     * Probes the device read-only and caches the refined capability set.
+     *
+     * Pass the model's own set (Model\TerminalModelFactory::for($model)->capabilities())
+     * so a probe refines THAT model's levels; without it the F18 baseline is used.
+     */
+    public function probeCapabilities(?CapabilitySet $baseline = null): CapabilitySet
     {
-        return $this->capabilities = (new CapabilityResolver($this->client))->resolve();
+        return $this->capabilities = (new CapabilityResolver($this->client, $baseline))->resolve();
     }
 
     // --- Pass-throughs for whole-device concerns ---

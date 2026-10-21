@@ -34,11 +34,12 @@ use Promoseven\Biometric\Value\DeviceUser;
  * no transport, no frame and no session model — folding them together would mean a
  * branch per vendor inside every method (rule 15).
  *
- * READ-ONLY BY CONSTRUCTION. There is no write method on this class at all. Every
- * C3 write — enrollment, SetDeviceData, and the door relay CONTROL_DEVICE (0x05) —
- * is unbuilt and unprobed, and rule 16 requires the owner's explicit go-ahead and a
- * terminal out of service before any of it is even attempted. A door relay is not
- * something to discover by accident.
+ * WRITES are table-level only here: writeRows() (SET_DATA 0x07) and deleteRows()
+ * (DELETE_DATA 0x09), both CONFIRMED on the TF1700 and the inBIO460 on 2026-09-24
+ * with a test user. The person-level operations built on them — add, edit, delete,
+ * fingerprint push — live in Promoseven\Biometric\C3\Service\Personnel, and
+ * moveUser() here. The door relay CONTROL_DEVICE (0x05) is still unbuilt: a door
+ * relay is not something to discover by accident (rule 16).
  *
  * USAGE
  *
@@ -51,7 +52,7 @@ use Promoseven\Biometric\Value\DeviceUser;
  *         $panel->close();
  *     }
  */
-final class Panel
+final class Panel implements TableStore
 {
     private C3TcpTransport $transport;
 
@@ -128,6 +129,48 @@ final class Panel
         }
 
         return $values;
+    }
+
+    /**
+     * The panel's clock, as LOCAL time in $timezone (the panel stores no zone). 2.12.0.
+     *
+     * GET_PARAM for the parameter "DateTime"; the value is the same packed integer as a
+     * transaction stamp (Timestamp, transcribed from vwout/zkaccess-c3-py utils.py
+     * C3DateTime: ((Y-2000)*12*31 + (M-1)*31 + (D-1))*86400 + h*3600 + m*60 + s).
+     * Null when the panel does not report it or it would not decode — "not read",
+     * never midnight (rule 10).
+     */
+    public function readClock(string $timezone): ?\DateTimeImmutable
+    {
+        [$reply, $payload] = $this->command(Command::GET_PARAM, 'DateTime');
+
+        if ($reply !== Command::REPLY_OK) {
+            throw $this->refusal('read the clock', $reply, $payload);
+        }
+        if (! preg_match('/DateTime=(\d+)/', $payload, $m)) {
+            return null;
+        }
+
+        return Timestamp::decode((int) $m[1], $timezone);
+    }
+
+    /**
+     * Sets the panel's clock to $local (the wall-clock time the panel should show) and
+     * returns the clock as read back. 2.12.0.
+     *
+     * DATETIME (0x03) with "DateTime=<packed>", transcribed from vwout/zkaccess-c3-py
+     * core.py set_device_datetime. The caller compares the read-back with what it
+     * asked for (rule 10: an acknowledgement proves nothing).
+     */
+    public function setClock(\DateTimeInterface $local, string $timezone): ?\DateTimeImmutable
+    {
+        [$reply, $payload] = $this->command(Command::DATETIME, 'DateTime='.Timestamp::encode($local));
+
+        if ($reply !== Command::REPLY_OK) {
+            throw $this->refusal('set the clock', $reply, $payload);
+        }
+
+        return $this->readClock($timezone);
     }
 
     /** The panel's own description of its schema. Cached for the life of the session. */
@@ -362,6 +405,9 @@ final class Panel
                 privilege: (int) ($row['Privilege'] ?? 0),
                 cardNumber: $card > 0 ? $card : null,
                 fingerSlots: $slotsByPin === null ? null : ($slotsByPin[$pin] ?? []),
+                // The user table's Password field (2.13.0): null when this panel's
+                // table has no such column, '' when the person has none.
+                password: array_key_exists('Password', $row) ? (string) $row['Password'] : null,
             );
         }
 
@@ -369,7 +415,8 @@ final class Panel
     }
 
     /**
-     * Writes rows to a table (SET_DATA, 0x07). EXPERIMENTAL — not yet sent to any panel.
+     * Writes rows to a table (SET_DATA, 0x07). CONFIRMED on the TF1700 and the
+     * inBIO460, 2026-09-24 (tools/zkprobe/traces-2026-09-24/c3-user-*.json).
      *
      * Payload built from THIS panel's catalogue (RecordCodec::encode). Reports what the
      * panel ACCEPTED only: callers must read the table back to confirm (rule 10).
@@ -390,7 +437,7 @@ final class Panel
 
     /**
      * Deletes the rows of a table whose $keyField equals $value (DELETE_DATA, 0x09).
-     * EXPERIMENTAL — not yet sent to any panel.
+     * CONFIRMED on the TF1700 and the inBIO460, 2026-09-24.
      *
      * The key field is NAMED and resolved through this panel's catalogue — a fork of
      * the reference hard-codes id 2 as "Pin", which on the TF1700 is CardNo and would

@@ -30,13 +30,17 @@ use Promoseven\Biometric\Exception\VerificationException;
  *                                  destroying a real person's finger was not an
  *                                  acceptable test.
  *  DOWNLOAD TEMPLATE BYTES         NOT IMPLEMENTED. See downloadTemplate().
- *  UPLOAD TEMPLATE BYTES           NOT IMPLEMENTED. See uploadTemplate().
+ *  READ TEMPLATE BYTES             CONFIRMED (allWithTemplates(), from the table).
+ *  ADD TEMPLATES TO A USER         EXPERIMENTAL until a hardware run confirms it —
+ *                                  see addTemplates(). SAVE_USERTEMPS, add-only,
+ *                                  verified by read-back.
+ *  PER-SLOT DOWNLOAD / UPLOAD      NOT IMPLEMENTED. See downloadTemplate() and
+ *                                  uploadTemplate(); addTemplates() replaces the
+ *                                  second for every caller.
  *
- * The consequence for a host app: biometric enrollment is DEVICE-SIDE. A finger
- * must be presented at a terminal; templates cannot currently be copied from one
- * device to another through this library. Architecture is ready for it (the
- * methods exist and throw a typed exception), so adding it later does not change
- * any caller's shape. See docs/device-capabilities.md.
+ * A finger is still captured at a terminal — this library cannot enrol one — but a
+ * template read off one device can be written to another (2.10.0).
+ * See docs/device-capabilities.md.
  */
 final class TemplateService
 {
@@ -239,6 +243,185 @@ final class TemplateService
     }
 
     /**
+     * Adds fingerprint templates to a user the device already holds, keeping their
+     * record, card and every finger they already have. Returns the slots written,
+     * as CONFIRMED by reading the table back.
+     *
+     * Added 2.10.0 (2026-10-11) so a host can keep its own copy of a finger and put
+     * it back on a terminal — after the person was removed and re-added, or onto a
+     * terminal they never enrolled on.
+     *
+     * HOW. SAVE_USERTEMPS (DeviceClient::saveUserWithTemplates, transcribed from
+     * fananimi/pyzk f29709c1) writes one user record and a set of templates in a
+     * single commit. The record sent is the DEVICE'S OWN 72-byte row
+     * (UserCodec::rawRecord), so name, card, privilege and password are rewritten
+     * with exactly what was there. The templates sent are the user's existing ones
+     * PLUS the new slots: whether SAVE_USERTEMPS replaces a user's template set or
+     * adds to it is not documented, and sending the full set is correct either way.
+     *
+     * ADD-ONLY. A slot the user already fills is never overwritten, whatever the
+     * caller passes — a working enrollment is never replaced by a copy.
+     *
+     * FAILS SAFE (rule 10 — the ACK proves nothing on this firmware family):
+     *   - refuses before writing if the user is not there, their record cannot be
+     *     isolated, or the template table will not decode (we would not know which
+     *     fingers they already have, nor be able to check afterwards);
+     *   - after the write, every finger they had must still be there with the same
+     *     bytes, and the record must still be theirs. If not, the original record and
+     *     fingers are written back and a VerificationException says what happened;
+     *   - a new slot that did not come back is not reported as written. If none did,
+     *     that is a VerificationException, not an empty success.
+     *
+     * EXPERIMENTAL until run against hardware — the host records the first
+     * confirmation per model (docs/device-capabilities.md).
+     *
+     * @param list<array{fid:int, template:string}> $templates
+     * @return list<int> slots written and read back
+     */
+    public function addTemplates(string $userId, array $templates): array
+    {
+        $rawUsers = $this->client->readUsersRaw();
+        $user = UserCodec::find(UserCodec::decode($rawUsers), $userId);
+
+        if ($user === null) {
+            throw new ProtocolException("User {$userId} is not on the device.", ['user_id' => $userId]);
+        }
+
+        $uid = (int) $user['uid'];
+        $record = UserCodec::rawRecord($rawUsers, $uid);
+
+        if ($record === null) {
+            throw new ProtocolException(
+                "Could not isolate {$userId}'s record in the user table; nothing was written.",
+                ['user_id' => $userId, 'uid' => $uid],
+            );
+        }
+
+        $existing = $this->templatesOf($uid);
+
+        if ($existing === null) {
+            throw new UnsupportedCommandException(
+                "The fingerprint table would not decode, so {$userId}'s current fingers are unknown and a write could not be checked. Nothing was written.",
+                ['user_id' => $userId, 'uid' => $uid],
+            );
+        }
+
+        $new = [];
+        foreach ($templates as $t) {
+            $fid = (int) $t['fid'];
+            if ($fid < 0 || $fid > 9) {
+                throw new \InvalidArgumentException("Finger slot must be 0-9, got {$fid}.");
+            }
+            if (isset($existing[$fid]) || isset($new[$fid]) || (string) $t['template'] === '') {
+                continue;
+            }
+            $new[$fid] = ['fid' => $fid, 'template' => (string) $t['template']];
+        }
+
+        if ($new === []) {
+            return [];
+        }
+
+        $keep = array_values(array_map(static fn (array $t) => ['fid' => $t['fid'], 'template' => $t['template']], $existing));
+        ksort($new);
+
+        $this->client->saveUserWithTemplates($record, array_merge($keep, array_values($new)));
+
+        $problem = $this->addMismatch($uid, $userId, $existing);
+
+        if ($problem !== null) {
+            $restored = false;
+            try {
+                $this->client->saveUserWithTemplates($record, $keep);
+                $restored = $this->addMismatch($uid, $userId, $existing) === null;
+            } catch (ProtocolException) {
+            }
+
+            throw new VerificationException(
+                "Writing fingerprints for {$userId} went wrong: {$problem} "
+                . ($restored
+                    ? 'Their record and ' . count($existing) . ' existing fingerprint(s) were put back.'
+                    : 'PUTTING BACK THEIR ORIGINAL RECORD ALSO FAILED. Read the terminal before anything else is written.'),
+                ['user_id' => $userId, 'uid' => $uid, 'restored' => $restored, 'slots_before' => array_keys($existing)],
+            );
+        }
+
+        $after = $this->templatesOf($uid) ?? [];
+        $written = [];
+        foreach ($new as $fid => $t) {
+            if (isset($after[$fid]) && $after[$fid]['sha1'] === sha1($t['template'])) {
+                $written[] = $fid;
+            }
+        }
+
+        if ($written === []) {
+            throw new VerificationException(
+                "The device accepted fingerprint slot(s) " . implode(', ', array_keys($new)) . " for {$userId} but did not keep any of them.",
+                ['user_id' => $userId, 'uid' => $uid, 'slots_sent' => array_keys($new)],
+            );
+        }
+
+        return $written;
+    }
+
+    /**
+     * A user's templates keyed by slot, or null when the table would not decode.
+     *
+     * @return array<int,array{fid:int,template:string,sha1:string}>|null
+     */
+    private function templatesOf(int $uid): ?array
+    {
+        $raw = $this->client->readTemplatesRaw();
+        $all = TemplateCodec::decodeWithBlobs($raw);
+
+        if ($all === [] && ! TemplateCodec::isEmptyTable($raw)) {
+            return null;
+        }
+
+        $mine = [];
+        foreach ($all as $t) {
+            if ($t['uid'] === $uid) {
+                $mine[(int) $t['fid']] = ['fid' => (int) $t['fid'], 'template' => $t['template'], 'sha1' => sha1($t['template'])];
+            }
+        }
+        ksort($mine);
+
+        return $mine;
+    }
+
+    /**
+     * Null when $userId is still on $uid with every finger in $before byte-identical;
+     * otherwise what is wrong, in words.
+     *
+     * @param array<int,array{sha1:string}> $before
+     */
+    private function addMismatch(int $uid, string $userId, array $before): ?string
+    {
+        $here = UserCodec::find(UserCodec::decode($this->client->readUsersRaw()), $userId);
+
+        if ($here === null) {
+            return "{$userId} was not on the device when read back.";
+        }
+        if ((int) $here['uid'] !== $uid) {
+            return "{$userId} moved from uid {$uid} to uid {$here['uid']}.";
+        }
+
+        $now = $this->templatesOf($uid);
+        if ($now === null) {
+            return $before === [] ? null : 'the fingerprint table would not decode afterwards, so the existing fingers could not be checked.';
+        }
+
+        $lost = [];
+        foreach ($before as $fid => $t) {
+            if (($now[$fid]['sha1'] ?? null) !== $t['sha1']) {
+                $lost[] = $fid;
+            }
+        }
+
+        return $lost === [] ? null : 'existing fingerprint slot(s) ' . implode(', ', $lost) . ' changed or disappeared.';
+    }
+
+    /**
      * Downloads one template's bytes so it can be stored or copied to another
      * device.
      *
@@ -266,9 +449,8 @@ final class TemplateService
     /**
      * Uploads a stored template to a device.
      *
-     * NOT IMPLEMENTED — the counterpart to downloadTemplate(). Until the blob format
-     * is verified against hardware, enrollment remains device-side: a finger has to
-     * be presented at the terminal.
+     * NOT IMPLEMENTED as a per-slot command. To put templates on a device, use
+     * addTemplates(), which writes them with the user record in one commit.
      */
     public function uploadTemplate(int $uid, int $fingerIndex, string $template): void
     {

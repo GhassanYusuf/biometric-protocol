@@ -369,38 +369,45 @@ final class C3ProtocolTest extends TestCase
     }
 
     /**
-     * Every write stays hidden.
+     * What a C3 panel may offer, and what it must never offer.
      *
-     * Rule 9: the UI hides anything that is not confirmed or implemented, and rule
-     * 16 forbids probing a write against a live entrance. The door relay in
-     * particular must never drift up to a level the UI would offer — that is a
-     * button that opens a real door.
+     * Changed deliberately on 2026-09-24: people and fingerprint writes are offered
+     * (IMPLEMENTED) on the two models they have been built and partly run against —
+     * never CONFIRMED until the per-model probe has run, and never on an unknown
+     * panel. Enrollment stays hidden (the family has no capture command), and so do
+     * template delete, attendance clear and above all the door relay — a button that
+     * opens a real door.
      */
-    public function test_no_write_capability_is_ever_offered(): void
+    public function test_only_the_built_writes_are_offered_and_the_relay_never(): void
     {
-        $writes = [
-            Capability::USER_WRITE,
-            Capability::USER_DELETE,
+        $never = [
             Capability::FINGERPRINT_ENROLL,
-            Capability::TEMPLATE_UPLOAD,
             Capability::TEMPLATE_DELETE,
             Capability::ATTENDANCE_CLEAR,
             Capability::RELAY,
         ];
+        $offered = [
+            Capability::USER_WRITE,
+            Capability::USER_DELETE,
+            Capability::CARD_WRITE,
+            Capability::TEMPLATE_UPLOAD,
+        ];
+        $hidden = [Capability::NOT_IMPLEMENTED, Capability::UNKNOWN];
 
         foreach ([PanelModelFactory::for('inBIO460'), PanelModelFactory::for('TF1700'), PanelModelFactory::for(null)] as $model) {
-            foreach ($writes as $write) {
-                $this->assertNotSame(
-                    Capability::CONFIRMED,
-                    $model->capabilities()->level($write),
-                    "{$model->name()} must not confirm the write capability {$write}.",
-                );
-                $this->assertNotSame(
-                    Capability::IMPLEMENTED,
-                    $model->capabilities()->level($write),
-                    "{$model->name()} must not offer the write capability {$write}.",
-                );
+            foreach ($never as $write) {
+                $this->assertContains($model->capabilities()->level($write), $hidden, "{$model->name()} must not offer {$write}.");
             }
+        }
+
+        foreach ([PanelModelFactory::for('inBIO460'), PanelModelFactory::for('TF1700')] as $model) {
+            foreach ($offered as $write) {
+                $this->assertSame(Capability::IMPLEMENTED, $model->capabilities()->level($write), "{$model->name()}: {$write} is built but not yet confirmed.");
+            }
+        }
+
+        foreach ($offered as $write) {
+            $this->assertContains(PanelModelFactory::for(null)->capabilities()->level($write), $hidden, "An unidentified panel must not offer {$write}.");
         }
     }
 }

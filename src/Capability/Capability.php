@@ -35,11 +35,21 @@ final class Capability
     public const USER_DISABLE = 'user.disable';
     /** Move a user to a different user id (PIN), keeping uid, card and templates. */
     public const USER_RENUMBER = 'user.renumber';
+    /**
+     * Set a user's privilege on the terminal — on the ZKTeco standalones, normal user
+     * (0) or administrator (14), who may open the terminal's menu. 2.14.0.
+     */
+    public const USER_PRIVILEGE = 'user.privilege';
 
     // --- Cards ---
     public const CARD_READ = 'card.read';
     public const CARD_WRITE = 'card.write';
     public const CARD_ENROLL = 'card.enroll';
+
+    // The keypad password (2.13.0). A door credential like the card, so it is read and
+    // written as one, and never printed.
+    public const PASSWORD_READ = 'password.read';
+    public const PASSWORD_WRITE = 'password.write';
 
     // --- Fingerprints ---
     public const FINGERPRINT_ENROLL = 'fingerprint.enroll';

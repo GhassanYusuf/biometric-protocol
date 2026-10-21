@@ -31,7 +31,7 @@ final class UserCodec
     }
 
     /**
-     * @return list<array{uid:int,user_id:string,name:string,privilege:int,card_number:int}|array{raw:string}>
+     * @return list<array{uid:int,user_id:string,name:string,privilege:int,card_number:int,password:string}|array{raw:string}>
      */
     public static function decode(string $raw): array
     {
@@ -58,6 +58,7 @@ final class UserCodec
             if ($recordSize >= 72) {
                 $uid = unpack('v', substr($chunk, 0, 2))[1];
                 $privilege = ord($chunk[2]);
+                $password = RecordBuffer::cString(substr($chunk, 3, 8));
                 $name = RecordBuffer::cString(substr($chunk, 11, 24));
                 $cardNumber = unpack('V', substr($chunk, 35, 4))[1];
                 $userId = RecordBuffer::cString(substr($chunk, 48, 9));
@@ -70,6 +71,8 @@ final class UserCodec
                     'name' => $name,
                     'privilege' => $privilege,
                     'card_number' => $cardNumber,
+                    // The keypad password, '' when none. CONFIRMED on read (2.13.0).
+                    'password' => $password,
                 ];
             } else {
                 $users[] = ['raw' => bin2hex($chunk)];

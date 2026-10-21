@@ -59,6 +59,13 @@ final class Command
     /** CONFIRMED inBIO460, TF1700. */
     public const DISCONNECT = 0x02;
 
+    /**
+     * Sets the panel clock: payload "DateTime=<packed>" (C3 Timestamp format).
+     * Transcribed from vwout/zkaccess-c3-py consts.py (DATETIME = 0x03) and core.py
+     * set_device_datetime, 2026-10-11. See Panel::setClock().
+     */
+    public const DATETIME = 0x03;
+
     /** Reads named parameters. CONFIRMED inBIO460, TF1700 — answers with no session. */
     public const GET_PARAM = 0x04;
 

@@ -16,9 +16,24 @@ checksum, session model and command set. Pick the family by reading the device,
 **never by the model name**: the TF1700 is sold as a standalone fingerprint
 terminal and speaks C3.
 
-The standalone family reads attendance, users, fingerprint templates and cards,
-and drives enrollment. The C3 family is **read-only** in this release: identity,
-schema and the transaction table.
+The standalone family reads attendance, users, fingerprint templates, cards and
+keypad passwords, and drives enrollment. The C3 family reads identity, schema, the
+transaction table, users (with their keypad passwords) and templates, and writes
+users through `C3\Service\Personnel` (EXPERIMENTAL — see the capability levels).
+
+Since 2.13.0 a user write keeps the keypad password the device holds unless one is
+passed; earlier releases erased it on every standalone write. See CHANGELOG.md.
+Since 2.14.1 `password.write` is in `CapabilityResolver::unprobeable()`, so a host app
+can record it as earned on one terminal after a real write test and keep it across
+re-probes. Since 2.15.0 `password.write` is CONFIRMED on the F18, F22, inBIO460 and
+TF1700 (read back on hardware, 2026-10-20).
+
+Since 2.14.0 the standalone family reports the terminal's own record counts without a
+transfer (`AttendanceService::deviceCount()`, `DeviceClient::recordCounts()`), clears the
+attendance log only against a count the caller has stored and verifies it empty
+afterwards (`clearAll($expectedRecords)`), sets a user's privilege with a read-back
+(`UserService::setPrivilege()`), and treats a 40-byte attendance record with an empty
+user id as undecodable.
 
 > **Proprietary software.** Not open source. See [LICENSE](LICENSE) — possession
 > of a copy grants no licence to use it.
@@ -196,9 +211,14 @@ table `slotsByUserId()` already reads, immediately after each record's 6-byte he
 CONFIRMED on a ZKTeco F18 (192.168.7.62) and F22 (192.168.7.63), 2026-09-15: user
 id 261 slot 3 returned the same 1,054 bytes from both models.
 
-Writing a template back to a device is a **separate, unverified** problem —
-`downloadTemplate()` and `uploadTemplate()` still throw. If you only need to know
-whether two records are one human, you do not need either: hash what you read.
+Writing templates back (2.10.0): `templates()->addTemplates($userId, [['fid' => 6,
+'template' => $bytes]])` adds them to a user the device already holds, never
+overwrites a filled slot, and returns only the slots that read back byte-identical
+(`SAVE_USERTEMPS`). Write CONFIRMED on a ZKTeco F18, 2026-10-11, with a template read
+off a C3 inBIO460; that the finger then MATCHES at the terminal is not yet observed,
+so `template.upload` is `implemented`. The per-slot `downloadTemplate()` /
+`uploadTemplate()` still throw. If you only need to know whether two records are one
+human, you need none of this: hash what you read.
 
 Templates are biometric data. Prefer storing the digest over the bytes.
 

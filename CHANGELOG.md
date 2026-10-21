@@ -6,6 +6,163 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.15.0 — 2026-10-20
+
+### Changed — `password.write` CONFIRMED on all four models
+
+- F18 (`CapabilitySet::defaults()`), F22, inBIO460 and TF1700: IMPLEMENTED → CONFIRMED.
+  Evidence: the host app's `tools/zkprobe/user-password-write.php` on every terminal of
+  each model — IT ROOM, Camelot, Good Wheels (F18), On The Road (F22), Glass Door
+  (inBIO460), Entrance (TF1700) — twice each on 2026-10-20: a temporary test user's
+  passwords 1357 and 2468 written and read back equal, a name write with no password
+  kept it, the test user deleted and the roster unchanged.
+
+### Changed — `user.privilege` CONFIRMED on the F18 and F22
+
+- F18: IMPLEMENTED → CONFIRMED. F22: UNKNOWN → CONFIRMED (same `USER_WRQ` record and
+  `UserService::setPrivilege()` as the F18). Evidence: the host app's
+  `tools/zkprobe/user-privilege-write.php` on IT ROOM, Camelot, Good Wheels and On The
+  Road, twice each on 2026-10-20: a test user made administrator (14) then normal user
+  (0), each read back, name and password kept, every other user's privilege unchanged.
+  C3 panels stay not_implemented: their user table has no terminal-menu administrator.
+
+## 2.14.1 — 2026-10-20
+
+### Fixed — `password.write` is unprobeable
+
+- `CapabilityResolver::unprobeable()` now lists `Capability::PASSWORD_WRITE` ("Would
+  change a real person's keypad password"). Without it a host app that stored a
+  per-terminal `password.write` level after a real write test lost it on the next
+  re-probe, which fell back to the model's level. No probe ever wrote a password; this
+  only changes which stored levels a re-probe keeps.
+- `password.write` on the F18 (`CapabilitySet::defaults()`) stays IMPLEMENTED. The write
+  read back on IT ROOM (F18, 192.168.7.62) twice on 2026-10-20 — name write kept it too
+  — but one terminal does not confirm a model whose other units run other firmware
+  (Good Wheels, F18/ID, 2021 firmware, never written).
+
+## 2.14.0 — 2026-10-18
+
+### Added — the terminal's own record counts
+
+- `Codec\FreeSizesCodec` decodes the `GET_FREE_SIZES` (50) reply: users, fingers,
+  attendance records, cards and capacities, as little-endian int32s at pyzk's indices.
+  CONFIRMED 2026-10-18: `records` equalled a full attendance read on three F18s and an
+  F22. Fixture `tests/Fixtures/f18-free-sizes-itroom.bin`.
+- `DeviceClient::recordCounts()`, `AttendanceService::deviceCount()` — null when the
+  reply does not decode, never a guessed 0.
+
+### Changed — `AttendanceService::clearAll()` is guarded
+
+- `clearAll(?int $expectedRecords = null): int`. With a count, refuses (nothing sent)
+  when the terminal holds a different number; after `CLEAR_ATTLOG` the count must read 0,
+  or `VerificationException`. Returns the number held before. Still never called by any
+  sync flow, still never run on hardware.
+
+### Added — `UserService::setPrivilege()`
+
+- Administrator (`PRIVILEGE_ADMIN` = 14) or normal user (`PRIVILEGE_USER` = 0) on an
+  existing record, name / card / password kept, privilege verified on read-back.
+  `Capability::USER_PRIVILEGE` (`user.privilege`): IMPLEMENTED in `defaults()`, UNKNOWN
+  on the F22 and generic terminals, NOT_IMPLEMENTED on C3.
+
+### Fixed — a 40-byte attendance record with no user id decoded as a punch
+
+- `AttendanceCodec` returns it as `['raw' => hex]`. OBSERVED on Camelot (F18,
+  87.237.196.60): misaligned transfers yielded 2,876 such "punches" dated 1999–2030.
+
+### Changed — F22 levels
+
+- `attendance.clear` and `user.privilege` are UNKNOWN on the F22 rather than inherited
+  from the F18 set; neither has run on either model.
+
+## 2.13.0 — 2026-10-12
+
+### Fixed — every standalone user write erased the keypad password
+
+- `Packet::buildUserRecord()` left password(8)@3 zero, and `UserService::save()` rebuilt
+  the record from name, card and privilege only. So every name push and every
+  `setCard()` ERASED a password set at the terminal keypad. OBSERVED 2026-10-12: IT ROOM
+  (F18, 192.168.7.62) lacked a password the host app still held.
+- `save()` now keeps the device's password when `$password` is null, writes it when
+  given, clears it with `''`, and verifies it on read-back (`VerificationException`
+  that never prints the value). `setCard()` keeps it through `save()`.
+
+### Added — the keypad password, read and written
+
+- `Capability::PASSWORD_READ` (`password.read`), `Capability::PASSWORD_WRITE`
+  (`password.write`).
+- `UserCodec::decode()` returns `password`; `DeviceUser::$password` ('' none, null not
+  read) and `hasPassword()`. `toArray()` carries only `has_password`, never the value.
+- `Packet::buildUserRecord(..., string $password = '')`, `DeviceClient::writeUser(...,
+  string $password = '')` — refused over 8 bytes.
+- C3: `Panel::readUsers()` fills `password` from the `user` table's `Password` field;
+  `Personnel::add(..., string $password = '')`, `Personnel::update(..., ?string
+  $password = null)` (null keeps the row's own). A mismatch on read-back never prints it.
+- Levels: `password.read` CONFIRMED on the F18, F22, inBIO460 and TF1700 — 2026-10-12
+  every password the host app held equalled the terminal's (host app
+  `tools/zkprobe/traces-2026-10-12/user-passwords-02.json`). `password.write` IMPLEMENTED
+  on those four (the generic panel: not implemented; any other terminal: unknown).
+- Tests: `UserPasswordTest`, `C3PersonnelTest::test_a_name_edit_keeps_the_keypad_password…`.
+
+## 2.12.0 — 2026-10-11
+
+### Added — the C3 panel clock
+
+- `C3\Protocol\Command::DATETIME` (0x03), transcribed from vwout/zkaccess-c3-py
+  (`consts.py`, `core.py` set_device_datetime).
+- `C3\Client\Panel::readClock($timezone)` — GET_PARAM "DateTime", decoded with the
+  transaction-stamp format (`Timestamp`); null when not reported.
+- `Panel::setClock($local, $timezone)` — DATETIME "DateTime=<packed>", then read back.
+- `InBio460`, `Tf1700`: `device.time.read` / `device.time.write` CONFIRMED —
+  2026-10-11 both panels read ~650 s slow, set, and read back exact.
+
+## 2.11.1 — 2026-10-11
+
+### Fixed — a C3 edit could cut a person's fingerprints off their record
+
+- OBSERVED on the TF1700 @ 192.168.7.60: editing Pin 781054761's `user` row (sent
+  without UID, as ZKAccess does) re-inserted it under UID 51 — freed moments earlier by
+  another delete — instead of 318. Its `templatev10` rows stayed on UID 318, so the
+  finger no longer belonged to the person. The inBIO460 kept the UID for the same edit.
+- `C3\Service\Personnel::relinkFingerprints($pin)`: rewrites a person's template rows
+  under their current UID; delete by Pin, write, verify byte for byte and the UID on
+  every row, restore the originals on any failure.
+- `Personnel::update()` re-links before every edit (a re-push repairs an old break) and
+  after one that changed the UID, instead of only refusing.
+- Tests: `C3PersonnelTest` (UID re-insert, stale link, failed re-link restored).
+
+## 2.11.0 — 2026-10-11
+
+### Added — one capability set per standalone MODEL
+
+The standalone family shared `CapabilitySet::defaults()` (the F18), so a level proven
+on the F18 was claimed for every model. Now, as the C3 family already did:
+- `Model\TerminalModel`, `Model\F18` (= `defaults()`, unchanged), `Model\F22` (its own
+  evidence: reads, user write and delete CONFIRMED; template upload, renumber,
+  template delete, enrolment UNKNOWN; card write IMPLEMENTED), `Model\GenericTerminal`
+  (a model with no file: reads IMPLEMENTED, every write UNKNOWN),
+  `Model\TerminalModelFactory::for($model)` (discovers model files, names none).
+- `CapabilityResolver` and `Device::probeCapabilities()` take an optional baseline, so
+  a probe refines the model's own set.
+- Tests: `tests/Unit/TerminalModelTest.php`.
+
+## 2.10.0 — 2026-10-11
+
+### Added — put stored fingerprints on a standalone terminal
+
+- `TemplateService::addTemplates($userId, $templates)`: add-only, via
+  `SAVE_USERTEMPS` with the device's own record and the user's existing templates
+  plus the new slots (correct whether the firmware replaces or merges the set).
+  Refuses before writing on a missing user, an unisolatable record or an undecodable
+  table; verifies existing fingers byte-for-byte afterwards and writes the original
+  back if one changed; returns only slots read back byte-identical.
+- `CapabilitySet::defaults()`: `template.upload` `not_implemented` → `implemented`.
+  2026-10-11, F18 @ 192.168.7.62: slot 6 (1,132 bytes, read off an inBIO460) added to
+  uid 20 and read back identical; every other user and template unchanged. A real
+  finger scan has not been observed yet.
+- Tests: `tests/Unit/TemplateAddTest.php` (in-memory terminal, both replace and merge
+  semantics, dropped writes, lost existing fingers).
+
 ## 2.9.0 — 2026-09-24
 
 ### Added — C3 table writes (EXPERIMENTAL; CONFIRMED on the TF1700 for `user`)

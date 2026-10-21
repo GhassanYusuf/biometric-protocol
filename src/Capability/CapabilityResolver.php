@@ -29,7 +29,14 @@ use Promoseven\Biometric\Codec\UserCodec;
  */
 final class CapabilityResolver
 {
-    public function __construct(private readonly DeviceClient $client)
+    /**
+     * @param CapabilitySet|null $baseline the MODEL's own set (Model\TerminalModel,
+     *        2.11.0) that probing refines; null = CapabilitySet::defaults(), the F18.
+     */
+    public function __construct(
+        private readonly DeviceClient $client,
+        private readonly ?CapabilitySet $baseline = null,
+    )
     {
     }
 
@@ -98,7 +105,7 @@ final class CapabilityResolver
             return true;
         });
 
-        return CapabilitySet::defaults()->with(array_filter($levels));
+        return ($this->baseline ?? CapabilitySet::defaults())->with(array_filter($levels));
     }
 
     /**
@@ -130,7 +137,11 @@ final class CapabilityResolver
             Capability::USER_DELETE => 'Would delete a real user.',
             Capability::USER_RENUMBER => 'Would change the user id attendance is recorded under, and could cost fingerprints.',
             Capability::USER_DISABLE => 'Would clear a real card.',
+            Capability::USER_PRIVILEGE => 'Would change who can open the terminal menu.',
             Capability::CARD_WRITE => 'Would overwrite a real card number.',
+            // 2.14.1: was missing, so a re-probe overwrote a password.write level a host
+            // app had recorded for one terminal after a real write test.
+            Capability::PASSWORD_WRITE => 'Would change a real person\'s keypad password.',
             Capability::CARD_ENROLL => 'Requires a physical card tap at the terminal.',
             Capability::FINGERPRINT_ENROLL => 'Requires a finger at the terminal.',
             Capability::TEMPLATE_DELETE => 'Would destroy a real fingerprint template.',

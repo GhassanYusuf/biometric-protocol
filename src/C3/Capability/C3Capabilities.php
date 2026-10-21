@@ -64,8 +64,11 @@ final class C3Capabilities
             Capability::USER_WRITE => Capability::NOT_IMPLEMENTED,
             Capability::USER_DELETE => Capability::NOT_IMPLEMENTED,
             Capability::USER_RENUMBER => Capability::NOT_IMPLEMENTED,
+            // The C3 `user` table has a Privilege field; nothing writes it (2.14.0).
+            Capability::USER_PRIVILEGE => Capability::NOT_IMPLEMENTED,
             Capability::USER_DISABLE => Capability::NOT_IMPLEMENTED,
             Capability::CARD_WRITE => Capability::NOT_IMPLEMENTED,
+            Capability::PASSWORD_WRITE => Capability::NOT_IMPLEMENTED,
             Capability::CARD_ENROLL => Capability::NOT_IMPLEMENTED,
             Capability::FINGERPRINT_ENROLL => Capability::NOT_IMPLEMENTED,
             Capability::TEMPLATE_DELETE => Capability::NOT_IMPLEMENTED,
@@ -86,6 +89,9 @@ final class C3Capabilities
             // live entrance (rule 16). Unknown is the truthful level, and the UI
             // hides it.
             Capability::CARD_READ => Capability::UNKNOWN,
+            // The user table's Password field; read with every roster read, but a
+            // panel nobody has compared against claims nothing more (2.13.0).
+            Capability::PASSWORD_READ => Capability::IMPLEMENTED,
             Capability::GET_TIME => Capability::UNKNOWN,
             Capability::VERIFY_MODE => Capability::UNKNOWN,
             Capability::ACCESS_SCHEDULES => Capability::UNKNOWN,
