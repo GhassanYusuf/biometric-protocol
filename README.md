@@ -325,6 +325,10 @@ Other models and firmware revisions are expected to work but are `implemented`,
 not `confirmed` — the capability system exists so you can tell the difference at
 runtime.
 
+Since 2.17.0 the **UA300** (ZMM200_TFT) has its own model file with its READS confirmed
+(users, cards, attendance, fingerprint blobs) and **no write offered**: none has run on
+one yet, and its clock write already applied later than an F18's does.
+
 Confirmed models already differ in ways that matter, within each family:
 
 - **F18 vs F22** — the F18 reads bulk tables over the push envelope; the F22 does

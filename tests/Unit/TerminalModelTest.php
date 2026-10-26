@@ -19,6 +19,7 @@ use Promoseven\Biometric\Model\F18;
 use Promoseven\Biometric\Model\F22;
 use Promoseven\Biometric\Model\GenericTerminal;
 use Promoseven\Biometric\Model\TerminalModelFactory;
+use Promoseven\Biometric\Model\UA300;
 
 /**
  * Per-model capability sets for the standalone family (2.11.0): a method proven on
@@ -31,6 +32,7 @@ final class TerminalModelTest extends TestCase
         $this->assertInstanceOf(F18::class, TerminalModelFactory::for('F18'));
         $this->assertInstanceOf(F18::class, TerminalModelFactory::for('F18/ID'));
         $this->assertInstanceOf(F22::class, TerminalModelFactory::for('F22/ID'));
+        $this->assertInstanceOf(UA300::class, TerminalModelFactory::for('UA300/ID'));
         $this->assertInstanceOf(GenericTerminal::class, TerminalModelFactory::for(null));
         $this->assertInstanceOf(GenericTerminal::class, TerminalModelFactory::for('K40'));
         $this->assertInstanceOf(GenericTerminal::class, TerminalModelFactory::for('F180'));
@@ -57,6 +59,28 @@ final class TerminalModelTest extends TestCase
         $this->assertTrue($f22->isConfirmed(Capability::USER_WRITE));
         $this->assertTrue($f22->isConfirmed(Capability::USER_DELETE));
         $this->assertTrue($f22->isConfirmed(Capability::TEMPLATE_BLOB_READ));
+    }
+
+    /**
+     * 2.17.0. The UA300 (Catering, 2026-10-26) inherits no F18 write: none has run on
+     * it, and its one observed write, the clock, already behaved differently.
+     */
+    public function test_the_ua300_confirms_its_reads_and_claims_no_write(): void
+    {
+        $ua300 = (new UA300)->capabilities();
+
+        foreach ([Capability::USER_WRITE, Capability::USER_DELETE, Capability::CARD_WRITE,
+            Capability::TEMPLATE_UPLOAD, Capability::PASSWORD_WRITE, Capability::SET_TIME,
+            Capability::ATTENDANCE_CLEAR, Capability::DEVICE_WIPE] as $write) {
+            $this->assertFalse($ua300->supports($write), "{$write} must not be offered on the UA300 until it runs there");
+        }
+
+        foreach ([Capability::USER_READ, Capability::CARD_READ, Capability::ATTENDANCE_READ, Capability::TEMPLATE_BLOB_READ] as $read) {
+            $this->assertTrue($ua300->isConfirmed($read), "{$read} ran on Catering");
+        }
+
+        // Decoded on two of five roster reads only.
+        $this->assertSame(Capability::IMPLEMENTED, $ua300->level(Capability::TEMPLATE_TABLE_READ));
     }
 
     public function test_an_unknown_model_claims_no_write_and_confirms_nothing(): void

@@ -6,6 +6,23 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.17.0 — 2026-10-26
+
+### Added — the UA300 model (`Model\UA300`)
+
+- Matched by `UA300` / `UA300/ID`. Observed on one unit: Catering, 192.168.7.120,
+  "Ver 6.60 May 14 2018", ZMM200_TFT. Before this it got `GenericTerminal`.
+- Starts from the generic set (no write offered) and confirms only what that unit has
+  done, 2026-10-22 to 2026-10-26: ping, info, clock read, users, cards, attendance
+  (2,101 → 2,115 records, none undecodable), fingerprint blobs (27).
+- `template.table.read` stays IMPLEMENTED: the table would not decode on three of five
+  nightly roster reads.
+- `device.time.write` stays UNKNOWN: on its one run the terminal ACKed, the immediate
+  read-back still showed the old time, and the clock was right some hours later. An F18
+  applies it at once.
+- Research found nothing UA300- or ZMM200-specific in pyzk, pyzatt or php-zkteco.
+- Test: `TerminalModelTest::test_the_ua300_confirms_its_reads_and_claims_no_write`.
+
 ## 2.16.2 — 2026-10-21
 
 ### Fixed — the first finger on an empty terminal could not be WRITTEN
