@@ -25,6 +25,7 @@ use Promoseven\Biometric\Capability\CapabilitySet;
  * has done. No F18 write is inherited: the first write evidence already differs
  * (below). Research (2026-10-26) found nothing model-specific for the UA300 or the
  * ZMM200 in pyzk, pyzatt or php-zkteco, so its writes are learned on the terminal.
+ * Password, privilege, ID move in place, clear and wipe have never run on one: UNKNOWN.
  */
 final class UA300 implements TerminalModel
 {
@@ -65,12 +66,39 @@ final class UA300 implements TerminalModel
             Capability::TEMPLATE_TABLE_READ => Capability::IMPLEMENTED,
 
             /*
+             * USER WRITE: CONFIRMED on the UA300 2026-10-26 (2.18.0). The owner-approved
+             * write test (host app tools/zkprobe/ua300-write.php, trace
+             * traces-2026-10-26/ua300-write-01.json) added and renamed a test user, each
+             * read back. Before it, while the row wrongly said F18 (2026-10-25 13:19 to
+             * 2026-10-26 07:45 UTC), the owner's merges re-added about 17 workers under
+             * new user IDs through the app, each read back in the app (DC-032).
+             */
+            Capability::USER_WRITE => Capability::CONFIRMED,
+
+            /*
+             * IMPLEMENTED, offered with a warning: each ran clean and read back on that
+             * test (delete verified gone with its finger, every other user, card and
+             * finger byte-for-byte unchanged; card read back; template read back
+             * byte-identical, 1,444 bytes), and in the owner's merges. Not CONFIRMED: one
+             * worker (Riza, 870876872) was found at 08:19 UTC with her record still on
+             * the terminal but no finger and no card, after a finger was written and read
+             * back at 07:02 and a removal at 07:31 timed out connecting. Unexplained
+             * (DC-032). And no finger written here has yet been seen to match at the
+             * terminal.
+             */
+            Capability::USER_DELETE => Capability::IMPLEMENTED,
+            Capability::CARD_WRITE => Capability::IMPLEMENTED,
+            Capability::TEMPLATE_UPLOAD => Capability::IMPLEMENTED,
+
+            /*
              * Clock write: UNKNOWN. While the device row wrongly said F18 (2026-10-25
              * 13:19 to 2026-10-26 07:45 UTC) the nightly clock job ran twice. 02:00 UTC:
              * the terminal ACKed the time, but the read-back straight after still showed
              * the old time, 96 s slow, so the command failed. By 07:00 the clock was
              * right, so the write took effect LATER than the read-back. An F18 applies
-             * it at once. The write test must measure how late before this is offered.
+             * it at once. Not measured on the write test: the clock was already right, and
+             * making it wrong on purpose would stamp workers' punches wrong. To be run with
+             * --clock-only once it has drifted 30 s or more.
              */
             Capability::SET_TIME => Capability::UNKNOWN,
         ]);

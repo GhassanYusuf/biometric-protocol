@@ -325,9 +325,9 @@ Other models and firmware revisions are expected to work but are `implemented`,
 not `confirmed` — the capability system exists so you can tell the difference at
 runtime.
 
-Since 2.17.0 the **UA300** (ZMM200_TFT) has its own model file with its READS confirmed
-(users, cards, attendance, fingerprint blobs) and **no write offered**: none has run on
-one yet, and its clock write already applied later than an F18's does.
+The **UA300** (ZMM200_TFT) has its own model file (2.17.0): reads confirmed; since 2.18.0
+user add/rename confirmed and delete, card and fingerprint writes implemented, from one
+write test. Its clock write applied later than an F18's does and is still not offered.
 
 Confirmed models already differ in ways that matter, within each family:
 

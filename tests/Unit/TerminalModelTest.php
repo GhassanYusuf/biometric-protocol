@@ -62,15 +62,20 @@ final class TerminalModelTest extends TestCase
     }
 
     /**
-     * 2.17.0. The UA300 (Catering, 2026-10-26) inherits no F18 write: none has run on
-     * it, and its one observed write, the clock, already behaved differently.
+     * The UA300 (Catering) inherits no F18 write. 2.17.0 offered none; 2.18.0 offers the
+     * ones its write test ran, and still none of the others.
      */
-    public function test_the_ua300_confirms_its_reads_and_claims_no_write(): void
+    public function test_the_ua300_offers_only_the_writes_run_on_it(): void
     {
         $ua300 = (new UA300)->capabilities();
 
-        foreach ([Capability::USER_WRITE, Capability::USER_DELETE, Capability::CARD_WRITE,
-            Capability::TEMPLATE_UPLOAD, Capability::PASSWORD_WRITE, Capability::SET_TIME,
+        // 2.18.0, the write test on Catering 2026-10-26.
+        $this->assertTrue($ua300->isConfirmed(Capability::USER_WRITE));
+        foreach ([Capability::USER_DELETE, Capability::CARD_WRITE, Capability::TEMPLATE_UPLOAD] as $write) {
+            $this->assertSame(Capability::IMPLEMENTED, $ua300->level($write), "{$write} ran once, with one unexplained loss");
+        }
+
+        foreach ([Capability::USER_PRIVILEGE, Capability::PASSWORD_WRITE, Capability::SET_TIME,
             Capability::ATTENDANCE_CLEAR, Capability::DEVICE_WIPE] as $write) {
             $this->assertFalse($ua300->supports($write), "{$write} must not be offered on the UA300 until it runs there");
         }

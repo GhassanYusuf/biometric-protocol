@@ -6,6 +6,22 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.18.0 — 2026-10-26
+
+### Changed — the UA300 offers the writes its write test ran
+
+- An owner-approved write test on Catering (UA300/ID, 192.168.7.120; host app
+  `tools/zkprobe/ua300-write.php`, `traces-2026-10-26/ua300-write-01.json`): a test user
+  added, renamed, given a card and a fingerprint, each read back (the template
+  byte-identical), then deleted and verified gone, with every other user, card and finger
+  unchanged.
+- `user.write` CONFIRMED (also ~17 real re-adds through the host app, each read back).
+- `user.delete`, `card.write`, `template.upload` IMPLEMENTED, offered with a warning:
+  one worker's record was later found with its finger and card gone, unexplained, and no
+  finger written to a UA300 has yet been seen to match at the terminal.
+- `device.time.write`, `password.write`, `user.privilege`, `user.renumber`,
+  `attendance.clear`, `device.wipe` stay UNKNOWN.
+
 ## 2.17.0 — 2026-10-26
 
 ### Added — the UA300 model (`Model\UA300`)
