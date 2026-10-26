@@ -91,6 +91,13 @@ final class F22 implements TerminalModel
              *   template.delete, card.enroll, fingerprint.enroll, user.disable
              */
             Capability::USER_RENUMBER => Capability::UNKNOWN,
+
+            /*
+             * RESTART stays IMPLEMENTED here, as it was by inheritance before 2.20.0. The
+             * F18 set confirms it from a run on Camelot (2026-10-26); that run says
+             * nothing about an F22 (rule 15), so the F22 does not inherit the CONFIRMED.
+             */
+            Capability::RESTART => Capability::IMPLEMENTED,
             Capability::TEMPLATE_DELETE => Capability::UNKNOWN,
             Capability::CARD_ENROLL => Capability::UNKNOWN,
             Capability::FINGERPRINT_ENROLL => Capability::UNKNOWN,

@@ -133,7 +133,11 @@ final class Command
     {
     }
 
-    /** Human-readable name for a command code, for logs and error messages. */
+    /**
+     * Human-readable name for a command code, for logs and error messages. A reply that
+     * is no command but a vendor error reads "4995 Error inserting database" (2.20.0,
+     * ReplyCode); anything else stays UNKNOWN(n).
+     */
     public static function name(int $command): string
     {
         static $names = null;
@@ -147,6 +151,12 @@ final class Command
             }
         }
 
-        return $names[$command] ?? "UNKNOWN({$command})";
+        if (isset($names[$command])) {
+            return $names[$command];
+        }
+
+        $meaning = ReplyCode::meaning($command);
+
+        return $meaning !== null ? "{$command} {$meaning}" : "UNKNOWN({$command})";
     }
 }

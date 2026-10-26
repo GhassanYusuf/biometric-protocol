@@ -301,6 +301,7 @@ class DeviceClient
                 throw new ProtocolException("Device rejected the user write ({$reply->commandName()}).", [
                     'uid' => $uid,
                     'user_id' => $userId,
+                    'reply' => $reply->command,
                 ]);
             }
         });
@@ -315,6 +316,7 @@ class DeviceClient
             if (! $reply->isAccepted()) {
                 throw new ProtocolException("Device rejected the user delete ({$reply->commandName()}).", [
                     'uid' => $uid,
+                    'reply' => $reply->command,
                 ]);
             }
         });
@@ -347,6 +349,7 @@ class DeviceClient
             if (! $reply->isAccepted()) {
                 throw new ProtocolException("Device rejected the user+template save ({$reply->commandName()}).", [
                     'bytes' => strlen($buffer),
+                    'reply' => $reply->command,
                 ]);
             }
         });
@@ -429,10 +432,23 @@ class DeviceClient
      * DOCUMENTED, never exercised here. Drops the session and any in-flight
      * transfer; the device is unreachable for however long it takes to come back.
      */
+    /**
+     * Reboots the terminal. CONFIRMED on the F18 2026-10-26 (Camelot 87.237.196.60,
+     * "Ver 6.60 Apr 26 2016"): ACK_OK, away from +2 s, answering again at +25 s, every
+     * table unchanged, the clock ~9 s behind after. The session is gone with it, so the
+     * transport is closed here; the caller waits for it to answer again.
+     *
+     * @throws ProtocolException when the terminal refuses (since 2.20.0; it used to be
+     *         reported as done whatever the reply)
+     */
     public function restart(): void
     {
-        $this->send(Command::RESTART);
+        $reply = $this->send(Command::RESTART);
         $this->session->transport()->close();
+
+        if (! $reply->isAccepted()) {
+            throw new ProtocolException("Device refused the restart ({$reply->commandName()}).");
+        }
     }
 
     // ----------------------------------------------------------------- signals

@@ -6,6 +6,31 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.20.0 — 2026-10-26
+
+### Added — vendor error replies are named (`Protocol\ReplyCode`)
+
+- `Command::name()` falls back to ZKTeco's own meaning for replies 4981-4999, transcribed
+  from ZKAccess 3.5.5 `language_en-US.xml` (`<SDKError_StandAlone>`). So Camelot's refusal
+  now reads "Device rejected the user write (4995 Error inserting database)." instead of
+  "(UNKNOWN(4995))". Anything else is still `UNKNOWN(n)`.
+- The user write, user delete and user+template save refusals carry the raw reply in
+  their context (`'reply' => 4995`), so a host can act on the code without parsing text.
+- Test: `ReplyCodeTest`.
+
+### Changed — restart is CONFIRMED on the F18, and checks its reply
+
+- `device.restart` CONFIRMED in the F18 set: Camelot (F18/ID, "Ver 6.60 Apr 26 2016"),
+  2026-10-26: `RESTART` (1004) → `ACK_OK`, answering again after 25 s, every table
+  unchanged, clock ~9 s behind after; it cleared a state that refused every user insert
+  with 4995 (host app casebook DC-034, trace `traces-2026-10-26/restart-01.json`).
+- The F22 states its own level, IMPLEMENTED, unchanged: the F18 run says nothing about it.
+  The UA300 and unknown models keep it UNKNOWN.
+- `DeviceClient::restart()` now throws `ProtocolException` when the terminal refuses; it
+  used to report success whatever the reply. Not covered by a client-level test: there is
+  no scripted transport for single commands yet.
+- Test: `TerminalModelTest::test_restart_is_confirmed_only_on_the_model_it_ran_on`.
+
 ## 2.19.0 — 2026-10-26
 
 ### Changed — the F18 no longer offers card scanning (`card.enroll` NOT_IMPLEMENTED)

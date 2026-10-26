@@ -104,7 +104,14 @@ final class CapabilitySet
              * user-privilege-write-01.json, -02.json).
              */
             Capability::USER_PRIVILEGE => Capability::CONFIRMED,
-            Capability::RESTART => Capability::IMPLEMENTED,
+            /*
+             * RESTART: CONFIRMED on the F18 2026-10-26 (2.20.0). Camelot 87.237.196.60,
+             * F18/ID "Ver 6.60 Apr 26 2016": ACK_OK, back after 25 s, tables unchanged,
+             * and it cleared the stuck state that refused every user insert with 4995
+             * (host app casebook DC-034, tools/zkprobe/traces-2026-10-26/restart-01.json).
+             * Never run on IT ROOM or Good Wheels (2021 firmware).
+             */
+            Capability::RESTART => Capability::CONFIRMED,
             // Approximated by clearing the card — the protocol has no suspend flag.
             Capability::USER_DISABLE => Capability::IMPLEMENTED,
 

@@ -57,6 +57,18 @@ final class TerminalModelTest extends TestCase
         $this->assertTrue($f18->isConfirmed(Capability::CARD_WRITE));
     }
 
+    /**
+     * 2.20.0. Restart is CONFIRMED on the F18 (Camelot, 2026-10-26); the F22 keeps the
+     * IMPLEMENTED it had, and a model without its own file is never offered it.
+     */
+    public function test_restart_is_confirmed_only_on_the_model_it_ran_on(): void
+    {
+        $this->assertTrue((new F18)->capabilities()->isConfirmed(Capability::RESTART));
+        $this->assertSame(Capability::IMPLEMENTED, (new F22)->capabilities()->level(Capability::RESTART));
+        $this->assertFalse((new UA300)->capabilities()->supports(Capability::RESTART));
+        $this->assertFalse(TerminalModelFactory::for('K40')->capabilities()->supports(Capability::RESTART));
+    }
+
     public function test_writes_proven_only_on_the_f18_are_not_offered_on_the_f22(): void
     {
         $f22 = (new F22)->capabilities();
