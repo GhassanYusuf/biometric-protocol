@@ -76,17 +76,23 @@ final class UA300 implements TerminalModel
             Capability::USER_WRITE => Capability::CONFIRMED,
 
             /*
-             * IMPLEMENTED, offered with a warning: each ran clean and read back on that
-             * test (delete verified gone with its finger, every other user, card and
-             * finger byte-for-byte unchanged; card read back; template read back
-             * byte-identical, 1,444 bytes), and in the owner's merges. Not CONFIRMED: one
-             * worker (Riza, 870876872) was found at 08:19 UTC with her record still on
-             * the terminal but no finger and no card, after a finger was written and read
-             * back at 07:02 and a removal at 07:31 timed out connecting. Unexplained
-             * (DC-032). And no finger written here has yet been seen to match at the
-             * terminal.
+             * USER DELETE: CONFIRMED on the UA300 2026-10-26 (2.18.1). The write test's
+             * delete was verified gone with its finger, every other user, card and finger
+             * unchanged; the owner's merges removed ~17 old IDs; and Riza (870876872),
+             * resigned 07:30 UTC, was deleted at 07:31 even though the step after timed
+             * out. 2.18.0 called her an unexplained loss ("record kept, finger and card
+             * gone"); that was a misreading of her still-open link in the host app, not
+             * the terminal, which a fresh read at 08:58 settled (DC-032).
              */
-            Capability::USER_DELETE => Capability::IMPLEMENTED,
+            Capability::USER_DELETE => Capability::CONFIRMED,
+
+            /*
+             * IMPLEMENTED, offered with a warning. Card: one test write read back, and 10
+             * workers' cards on the terminal match the host app's. Fingerprint: the test
+             * template read back byte-identical (1,444 bytes), and the merges' fingers are
+             * present for every worker, but none written here has yet been seen to match
+             * at the terminal.
+             */
             Capability::CARD_WRITE => Capability::IMPLEMENTED,
             Capability::TEMPLATE_UPLOAD => Capability::IMPLEMENTED,
 

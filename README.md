@@ -326,8 +326,7 @@ not `confirmed` — the capability system exists so you can tell the difference 
 runtime.
 
 The **UA300** (ZMM200_TFT) has its own model file (2.17.0): reads confirmed; since 2.18.0
-user add/rename confirmed and delete, card and fingerprint writes implemented, from one
-write test. Its clock write applied later than an F18's does and is still not offered.
+user add, rename and delete confirmed (2.18.1), card and fingerprint writes implemented. Its clock write applied later than an F18's does and is still not offered.
 
 Confirmed models already differ in ways that matter, within each family:
 

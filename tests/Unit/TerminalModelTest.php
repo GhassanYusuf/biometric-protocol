@@ -71,8 +71,9 @@ final class TerminalModelTest extends TestCase
 
         // 2.18.0, the write test on Catering 2026-10-26.
         $this->assertTrue($ua300->isConfirmed(Capability::USER_WRITE));
-        foreach ([Capability::USER_DELETE, Capability::CARD_WRITE, Capability::TEMPLATE_UPLOAD] as $write) {
-            $this->assertSame(Capability::IMPLEMENTED, $ua300->level($write), "{$write} ran once, with one unexplained loss");
+        $this->assertTrue($ua300->isConfirmed(Capability::USER_DELETE)); // 2.18.1
+        foreach ([Capability::CARD_WRITE, Capability::TEMPLATE_UPLOAD] as $write) {
+            $this->assertSame(Capability::IMPLEMENTED, $ua300->level($write), "{$write} ran, not yet proven at the terminal");
         }
 
         foreach ([Capability::USER_PRIVILEGE, Capability::PASSWORD_WRITE, Capability::SET_TIME,

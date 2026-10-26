@@ -6,6 +6,17 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.18.1 — 2026-10-26
+
+### Fixed — a wrong finding in 2.18.0
+
+- 2.18.0 held `user.delete` at IMPLEMENTED for "one worker's record later found with its
+  finger and card gone, unexplained". That was a misreading: the worker (Catering, user
+  870876872) had been deleted from the terminal; only the host app's link to her stayed
+  open after a timeout. A fresh read settled it. `user.delete` on the UA300 is now
+  CONFIRMED. `card.write` and `template.upload` stay IMPLEMENTED: no finger written to a
+  UA300 has yet been seen to match at the terminal.
+
 ## 2.18.0 — 2026-10-26
 
 ### Changed — the UA300 offers the writes its write test ran
