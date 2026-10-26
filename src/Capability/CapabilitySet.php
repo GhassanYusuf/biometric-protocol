@@ -67,8 +67,21 @@ final class CapabilitySet
             // Implemented, never confirmed succeeding on hardware.
             Capability::SET_TIME => Capability::IMPLEMENTED,
             Capability::TEMPLATE_DELETE => Capability::IMPLEMENTED,
-            Capability::CARD_ENROLL => Capability::IMPLEMENTED,
             Capability::ATTENDANCE_REALTIME => Capability::IMPLEMENTED,
+            /*
+             * CARD_ENROLL: NOT_IMPLEMENTED on the F18 since 2.19.0 (was IMPLEMENTED, never
+             * once returned a right number). Tested 2026-10-26 on IT ROOM 192.168.7.62
+             * (host app casebook DC-033): a tapped card's number is in NO realtime push
+             * (REG_EVENT 0xFFFF: only EF_VERIFY, ffffffff01 "unidentified"), and
+             * START_ENROLL slot 11 starts no card enrolment (ACKed; the screen showed
+             * "Verify: Badge, Badge number ..., Failed to verify" with START_VERIFY, nothing
+             * without it; the user record never gained the card). The terminal reads the
+             * card but does not hand its number over. EnrollmentService::captureCard()
+             * stays for other firmware; on the F18 a card is assigned by typing its number
+             * (card.write, CONFIRMED). Research found no documented wire event for it:
+             * the SDK's OnHIDNum is undocumented in every open reference.
+             */
+            Capability::CARD_ENROLL => Capability::NOT_IMPLEMENTED,
             /*
              * ATTENDANCE_CLEAR: AttendanceService::clearAll(), guarded since 2.14.0 by the
              * terminal's own record count before and after. Never run on hardware.

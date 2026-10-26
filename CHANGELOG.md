@@ -6,6 +6,22 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.19.0 — 2026-10-26
+
+### Changed — the F18 no longer offers card scanning (`card.enroll` NOT_IMPLEMENTED)
+
+- It was IMPLEMENTED and never once returned a right number. Tested on IT ROOM
+  (192.168.7.62, "Ver 6.60 Apr 26 2016", ZMM210_TFT) with a known card, 2026-10-26: the
+  terminal reads the card (its screen shows the number) but no realtime push carries the
+  number (`REG_EVENT 0xFFFF`: only `EF_VERIFY`, `ffffffff01`), and `START_ENROLL` slot 11
+  starts no card enrolment, with or without `START_VERIFY`; the user record never gained
+  the card. Host app traces `traces-2026-10-26/f18-card-event-01.json`,
+  `f18-card-enroll-mode-01..03.json`.
+- Assign cards on the F18 by number: `setCard` (`card.write`, CONFIRMED).
+- `EnrollmentService::captureCard()` is unchanged, for firmware that may push the number;
+  it still takes the first push as the card, which is wrong wherever that is `EF_VERIFY`.
+- Test: `TerminalModelTest::test_the_f18_does_not_offer_card_scanning`.
+
 ## 2.18.1 — 2026-10-26
 
 ### Fixed — a wrong finding in 2.18.0

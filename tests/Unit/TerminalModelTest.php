@@ -43,6 +43,20 @@ final class TerminalModelTest extends TestCase
         $this->assertSame(CapabilitySet::defaults()->toArray(), (new F18)->capabilities()->toArray());
     }
 
+    /**
+     * 2.19.0. The F18 reads a tapped card but never hands its number over (no realtime
+     * push carries it; START_ENROLL slot 11 starts no card enrolment): IT ROOM,
+     * 2026-10-26. Scanning is not offered; typing the number is.
+     */
+    public function test_the_f18_does_not_offer_card_scanning(): void
+    {
+        $f18 = (new F18)->capabilities();
+
+        $this->assertSame(Capability::NOT_IMPLEMENTED, $f18->level(Capability::CARD_ENROLL));
+        $this->assertFalse($f18->supports(Capability::CARD_ENROLL));
+        $this->assertTrue($f18->isConfirmed(Capability::CARD_WRITE));
+    }
+
     public function test_writes_proven_only_on_the_f18_are_not_offered_on_the_f22(): void
     {
         $f22 = (new F22)->capabilities();
