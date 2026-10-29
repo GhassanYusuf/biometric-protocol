@@ -6,6 +6,24 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.21.0 — 2026-10-29
+
+### Changed — a 40-byte punch record needs an all-digit user id
+
+- `AttendanceCodec` returns a 40-byte record whose user id is not all digits as undecodable
+  (`['raw' => hex]`), exactly like the blank-id records 2.14.0 already refused. Camelot (F18/ID,
+  87.237.196.60) answered a full read on 2026-10-29 with "records" whose ids were `L`, `Fl!`,
+  `ERMISSION`, `ption`, `]`, dated 1999-2000: text from some other buffer, read as punches.
+  They broke the host's insert (host app casebook DC-036). `decodeRealtime()` takes the same
+  guard. The 16- and 8-byte layouts build their ids from integers and are unchanged.
+- Evidence it costs nothing real: every user id ever stored from a ZKTeco standalone terminal
+  in the host app (F18, F22, UA300: every punch, user mapping and roster entry) is digits only.
+  Re-confirmed on hardware the same day, read-only, installed decoder plus the new rule: IT ROOM
+  (F18, 192.168.7.62) 11,624 punches, 0 rejected; On The Road (F22, 192.168.7.63) 8,535, 0;
+  Catering (UA300, 192.168.7.120) 2,133, 0 (host app trace
+  `tools/zkprobe/traces-2026-10-29/attendance-guard-check-01.json`).
+- Test: `AttendanceDecodeGuardTest` (synthetic records).
+
 ## 2.20.0 — 2026-10-26
 
 ### Added — vendor error replies are named (`Protocol\ReplyCode`)

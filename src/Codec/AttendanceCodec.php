@@ -97,6 +97,19 @@ final class AttendanceCodec
             return null;
         }
 
+        /*
+         * Nor is a user id that is not all digits. OBSERVED 2026-10-29 on Camelot (F18/ID,
+         * 87.237.196.60): a full read decoded "records" with user ids "L", "Fl!",
+         * "ERMISSION", "ption", "]" and stamps from 1999-2000 (host app casebook DC-036):
+         * text from another buffer, read as punches, which then broke the host's insert.
+         * Every user id ever stored from a ZKTeco standalone terminal in this project (F18,
+         * F22, UA300; every punch, user mapping and roster entry, checked 2026-10-29) is
+         * digits only; these terminals take ids on a numeric keypad. 2.21.0.
+         */
+        if (! ctype_digit($userId)) {
+            return null;
+        }
+
         $decoded = Timestamp::decode(unpack('V', substr($chunk, 27, 4))[1], $timezone);
 
         if ($decoded === null) {
