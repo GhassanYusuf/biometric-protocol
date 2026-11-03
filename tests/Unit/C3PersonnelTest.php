@@ -69,8 +69,13 @@ final class C3PersonnelTest extends TestCase
         $p = $this->panel();
         $p->tables['userauthorize'][] = ['Pin' => 30, 'AuthorizeTimezoneId' => 1, 'AuthorizeDoorId' => 1];
 
-        $this->expectException(ProtocolException::class);
-        (new Personnel($p))->add(30, 'carol');
+        try {
+            (new Personnel($p))->add(30, 'carol');
+            $this->fail('A Pin held in any table must be refused.');
+        } catch (ProtocolException $e) {
+            // 2.22.0: said in a form a host can act on, not only in the message.
+            $this->assertSame(['reason' => ProtocolException::PIN_IN_USE, 'pin' => '30', 'table' => 'userauthorize'], $e->context());
+        }
     }
 
     public function test_add_drops_fields_the_panel_does_not_carry(): void

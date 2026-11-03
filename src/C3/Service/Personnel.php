@@ -488,7 +488,7 @@ final class Personnel
     {
         foreach (['user', 'userauthorize', 'templatev10'] as $table) {
             if ($this->panel->catalogue()->has($table) && $this->rows($table, $pin) !== []) {
-                throw new ProtocolException("Pin {$pin} is already used in '{$table}' on this panel.");
+                throw new ProtocolException("Pin {$pin} is already used in '{$table}' on this panel.", ['reason' => ProtocolException::PIN_IN_USE, 'pin' => (string) $pin, 'table' => $table]);
             }
         }
     }

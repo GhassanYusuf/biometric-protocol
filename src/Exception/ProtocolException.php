@@ -22,4 +22,11 @@ namespace Promoseven\Biometric\Exception;
  */
 class ProtocolException extends DeviceException
 {
+    /**
+     * context()['reason'] when a write is refused because the user number is already taken
+     * on the device (2.22.0). With it: 'pin' and 'table'. A host can then offer to free the
+     * number instead of showing only the message (host app casebook DC-038).
+     */
+    public const PIN_IN_USE = 'pin_in_use';
+
 }

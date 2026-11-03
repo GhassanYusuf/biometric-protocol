@@ -495,7 +495,7 @@ final class Panel implements TableStore
         }
         foreach ($tables as $table) {
             if ($byPin($table, $toPin) !== []) {
-                throw new ProtocolException("Pin {$toPin} is already used in '{$table}' on this panel.");
+                throw new ProtocolException("Pin {$toPin} is already used in '{$table}' on this panel.", ['reason' => ProtocolException::PIN_IN_USE, 'pin' => (string) $toPin, 'table' => $table]);
             }
         }
 

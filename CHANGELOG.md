@@ -6,6 +6,18 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.22.0 — 2026-11-03
+
+### Added — a "number already taken" refusal says so in its context
+
+- The C3 refusals "Pin N is already used in 'table' on this panel." (`Personnel::add()`,
+  `Panel::moveUser()`) now carry `context() = ['reason' => ProtocolException::PIN_IN_USE,
+  'pin' => 'N', 'table' => 'table']`, so a host can offer to free the number instead of
+  showing only the message. Host app casebook DC-038: Suji's move to his CPR was refused on
+  Entrance (TF1700) and Glass Door (inBIO460) by a duplicate a merge had left, and the operator
+  had no button to clear it. The message is unchanged.
+- Test: `C3PersonnelTest::test_add_refuses_a_pin_held_in_any_table_even_an_orphaned_door_row`.
+
 ## 2.21.0 — 2026-10-29
 
 ### Changed — a 40-byte punch record needs an all-digit user id
