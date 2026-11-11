@@ -25,7 +25,8 @@ use Promoseven\Biometric\Capability\CapabilitySet;
  * has done. No F18 write is inherited: the first write evidence already differs
  * (below). Research (2026-10-26) found nothing model-specific for the UA300 or the
  * ZMM200 in pyzk, pyzatt or php-zkteco, so its writes are learned on the terminal.
- * Password, privilege, ID move in place, clear and wipe have never run on one: UNKNOWN.
+ * Password, ID move in place, clear and wipe have never run on one: UNKNOWN. Privilege is
+ * CONFIRMED since 2.23.0 (below).
  */
 final class UA300 implements TerminalModel
 {
@@ -107,6 +108,18 @@ final class UA300 implements TerminalModel
              * --clock-only once it has drifted 30 s or more.
              */
             Capability::SET_TIME => Capability::UNKNOWN,
+
+            /*
+             * USER_PRIVILEGE: CONFIRMED on the UA300 2026-11-11 (2.23.0), UNKNOWN before — not
+             * inherited from the F18 (rule 15). UserService::setPrivilege(), the F18's and the
+             * F22's method on the same USER_WRQ record. The owner-approved test (host app
+             * tools/zkprobe/user-privilege-write.php, host casebook DC-045) on Catering
+             * (192.168.7.120, Ver 6.60 May 14 2018): a temporary test user made 14 then 0, each
+             * read back, name and keypad password kept, the other 18 users' privileges
+             * unchanged, the test user deleted — twice, in two sessions
+             * (traces-2026-11-11/user-privilege-write-01.json, -02.json).
+             */
+            Capability::USER_PRIVILEGE => Capability::CONFIRMED,
         ]);
     }
 }

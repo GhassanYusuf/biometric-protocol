@@ -102,7 +102,10 @@ final class TerminalModelTest extends TestCase
             $this->assertSame(Capability::IMPLEMENTED, $ua300->level($write), "{$write} ran, not yet proven at the terminal");
         }
 
-        foreach ([Capability::USER_PRIVILEGE, Capability::PASSWORD_WRITE, Capability::SET_TIME,
+        // 2.23.0, the privilege test on Catering 2026-11-11, twice (host casebook DC-045).
+        $this->assertTrue($ua300->isConfirmed(Capability::USER_PRIVILEGE));
+
+        foreach ([Capability::PASSWORD_WRITE, Capability::SET_TIME,
             Capability::ATTENDANCE_CLEAR, Capability::DEVICE_WIPE] as $write) {
             $this->assertFalse($ua300->supports($write), "{$write} must not be offered on the UA300 until it runs there");
         }

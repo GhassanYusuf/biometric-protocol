@@ -6,6 +6,18 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.23.0 — 2026-11-11
+
+### Changed — the UA300 can make a user administrator or normal user
+
+- `UA300::capabilities()`: `USER_PRIVILEGE` UNKNOWN → **CONFIRMED**. Proven on Catering (UA300/ID,
+  Ver 6.60 May 14 2018) with `UserService::setPrivilege()`, the method the F18 and F22 already run:
+  a temporary test user made administrator (14) then normal (0), each read back with name and
+  keypad password kept, every other user's privilege unchanged, twice in two sessions (host app
+  casebook DC-045, traces `user-privilege-write-01/02.json`, 2026-11-11). The F18 and F22 sets are
+  not touched; no other UA300 write changes.
+- Test: `TerminalModelTest::test_the_ua300_offers_only_the_writes_run_on_it`.
+
 ## 2.22.0 — 2026-11-03
 
 ### Added — a "number already taken" refusal says so in its context
