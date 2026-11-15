@@ -156,6 +156,18 @@ per read. With `bulkWindowRetries: 0` (the pre-2.1.0 behaviour) every read pulle
 completes, re-reading only the stalled 16 KB windows. This also confirmed the
 **F18 supports windowed reads**, not only the F22.
 
+**A slow window is waited for, not asked for twice (2.24.0).** Over UDP a window request
+sometimes goes unanswered for just over the request timeout. Asking again was the old
+recovery, and on at least one F18 firmware it corrupts the read: once the same window has been
+requested twice, the device serves that window and every later one in the session 16–20 bytes
+off. The table arrives at the right length from clean datagrams and most records then fail to
+decode (16,276 punches, 409 decodable). Since 2.24.0, on UDP, a timed-out window request is
+followed by up to 20 s of waiting for **that request's own answer** (matched by reply id);
+only if none comes is the window requested again. Each window is also assembled only from
+datagrams carrying the request's reply id, placed by the sequence number the device puts in the
+header's session-id field, so a stray or repeated datagram can never become data. Both
+behaviours were confirmed on the F18, F22 and UA300 (2026-11-15). TCP is unchanged.
+
 **Buffer size.** The OS default receive buffer is 64 KB. One attendance table on
 an F18 is 412 KB. The protocol has no flow control, so the moment your reader
 pauses the device keeps transmitting and the kernel drops everything past the

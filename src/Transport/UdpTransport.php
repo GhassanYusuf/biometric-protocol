@@ -14,6 +14,7 @@ namespace Promoseven\Biometric\Transport;
 
 use Promoseven\Biometric\Contracts\HasReceiveBuffer;
 use Promoseven\Biometric\Contracts\SupportsRawDrain;
+use Promoseven\Biometric\Contracts\TracksRequestIds;
 use Promoseven\Biometric\Contracts\Transport;
 use Promoseven\Biometric\Exception\ConnectionException;
 use Promoseven\Biometric\Exception\TimeoutException;
@@ -38,7 +39,7 @@ use Promoseven\Biometric\Value\Reply;
  * 64 KB default to hold a whole table — see enlargeReceiveBuffer(), which is the
  * single most effective fix for short transfers on this protocol.
  */
-final class UdpTransport implements Transport, HasReceiveBuffer, SupportsRawDrain
+final class UdpTransport implements Transport, HasReceiveBuffer, SupportsRawDrain, TracksRequestIds
 {
     /** @var resource|null */
     private $socket = null;
@@ -377,6 +378,12 @@ final class UdpTransport implements Transport, HasReceiveBuffer, SupportsRawDrai
     public function resetReadTimeout(): void
     {
         $this->setReadTimeout((int) ceil($this->config->timeout));
+    }
+
+    /** CONFIRMED 2026-11-15 on the F18, F22 and UA300: replies echo it (see TracksRequestIds). */
+    public function lastRequestId(): int
+    {
+        return $this->replyId;
     }
 
     public function sessionId(): int

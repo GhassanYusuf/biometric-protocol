@@ -15,6 +15,7 @@ namespace Promoseven\Biometric\Transport;
 use Promoseven\Biometric\Contracts\HasReceiveBuffer;
 use Promoseven\Biometric\Contracts\ProgressListener;
 use Promoseven\Biometric\Contracts\SupportsRawDrain;
+use Promoseven\Biometric\Contracts\TracksRequestIds;
 use Promoseven\Biometric\Contracts\Transport;
 use Promoseven\Biometric\Exception\DeviceException;
 use Promoseven\Biometric\Exception\ProtocolException;
@@ -104,6 +105,14 @@ final class BulkReader
      * cannot turn the drain into an unbounded read. See drainStaleDatagrams().
      */
     private const MAX_STALE_DRAIN = 64;
+
+    /**
+     * Half-second polls spent waiting for a timed-out window request's own answer before it is
+     * asked for again: 20 s on top of the request timeout. The late answers seen on gems workshop
+     * came within milliseconds of the 8 s timeout (DC-047); the margin is generous because asking
+     * again is what shifts the session, and a short wait buys nothing.
+     */
+    private const LATE_REPLY_POLLS = 40;
 
     /**
      * Hard ceiling on fresh-session re-stages during one windowed read.
@@ -493,8 +502,21 @@ final class BulkReader
          */
         try {
             $reply = $this->transport->send(Command::READ_BUFFER, pack('VV', $start, $want));
-        } catch (DeviceException) {
-            return null;
+        } catch (DeviceException $e) {
+            // A transport that knows its request ids waits for this request's own late answer
+            // rather than asking again (2.24.0, DC-047: a repeated request shifts the session).
+            $reply = $this->transport instanceof TracksRequestIds
+                ? $this->awaitLateReply($this->transport->lastRequestId())
+                : null;
+
+            if ($reply === null) {
+                return null;
+            }
+        }
+
+        // A transport that knows its request ids gets the numbered window (2.24.0, DC-047).
+        if ($this->transport instanceof TracksRequestIds) {
+            return $this->readNumberedWindow($this->transport->lastRequestId(), $reply, $want);
         }
 
         if ($reply->isInlineData()) {
@@ -542,6 +564,143 @@ final class BulkReader
         $this->transport->readUnsolicited(0.2);
 
         return substr($window, 0, $want);
+    }
+
+    /**
+     * The late answer to a window request that outlived the request timeout, or null.
+     *
+     * CONFIRMED 2026-11-15 on gems workshop (F18, internet; host app casebook DC-047, traces
+     * datagram-headers-05…07): a READ_BUFFER sometimes goes unanswered for just over the 8 s
+     * timeout. Asking again was the 2.1.0 recovery, and on this firmware it is what does the
+     * damage: once the same window has been requested twice, the device serves THAT window and
+     * every later one in the session from the wrong place — 16 or 20 bytes on, from clean,
+     * correctly numbered datagrams — so every punch after it is undecodable (3 of 3 reads that
+     * re-requested; 16,276 punches decoding as 409). Waiting for the first request's own answer
+     * instead: 8 of 8 reads whole, the late answers arriving within milliseconds of the timeout.
+     *
+     * So the request is not repeated while its answer may still come. Datagrams for other
+     * requests are skipped; after LATE_REPLY_POLLS quiet or foreign polls the window counts as
+     * stalled, and only then is it requested again (readWindowed's retry), as before.
+     */
+    private function awaitLateReply(int $requestId): ?Reply
+    {
+        for ($i = 0; $i < self::LATE_REPLY_POLLS; $i++) {
+            $reply = $this->transport->readUnsolicited(0.5);
+
+            if ($reply !== null && $reply->replyId === $requestId) {
+                return $reply;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * One window, built only from the datagrams that answer THIS request, each in its place.
+     *
+     * CONFIRMED 2026-11-15, read-only, F18 (gems workshop over the internet; IT ROOM), F22
+     * (On The Road) and UA300 (Catering), over UDP (host app casebook DC-047, traces
+     * datagram-headers-01…04): the PREPARE_DATA reply, every DATA datagram and the closing
+     * ACK_OK carry the request's reply id, and a DATA datagram's session-id field numbers it
+     * 0, 1, 2 … within the window.
+     *
+     * A defence the headers make possible, not the cause of DC-047 on its own: once a window has
+     * been requested more than once (awaitLateReply makes that rare), or the link duplicates or
+     * reorders, datagrams answering another request can be on the socket. Read in arrival order
+     * with their headers stripped unread — the old loop — they become data. Here a datagram for
+     * another request is skipped, a repeated number is ignored, a gap refuses the window (it is
+     * re-requested, as a stall is), and the window's own ACK_OK is consumed rather than left to
+     * answer the next request.
+     *
+     * Returns exactly $want bytes, or null when the window did not arrive whole.
+     */
+    private function readNumberedWindow(int $requestId, Reply $reply, int $want): ?string
+    {
+        // send() reads one datagram; a late answer to an earlier request may be it.
+        $strays = 0;
+        while ($reply->replyId !== $requestId) {
+            if (++$strays > self::MAX_STALE_DRAIN) {
+                return null;
+            }
+            $next = $this->transport->readUnsolicited(0.2);
+            if ($next === null) {
+                return null;
+            }
+            $reply = $next;
+        }
+
+        if ($reply->isInlineData()) {
+            return strlen($reply->data) >= $want ? substr($reply->data, 0, $want) : null;
+        }
+
+        if (! $reply->isPreparingData()) {
+            return null;
+        }
+
+        $this->transport->setReadTimeout(0, 200_000);
+
+        $chunks = [];
+        $bytes = 0;
+        $closed = false;
+
+        try {
+            $emptyPolls = 0;
+
+            while ($bytes < $want && $emptyPolls < self::MAX_EMPTY_POLLS_PER_WINDOW) {
+                $packet = $this->transport->readUnsolicited(0.2);
+
+                if ($packet === null) {
+                    $emptyPolls++;
+
+                    continue;
+                }
+
+                $emptyPolls = 0;
+
+                if ($packet->replyId !== $requestId) {
+                    if (++$strays > self::MAX_STALE_DRAIN) {
+                        break;
+                    }
+
+                    continue; // an earlier request's datagram
+                }
+
+                if ($packet->command === Command::DATA) {
+                    if (! isset($chunks[$packet->sessionId])) {
+                        $chunks[$packet->sessionId] = $packet->data;
+                        $bytes += strlen($packet->data);
+                    }
+
+                    continue;
+                }
+
+                if ($packet->command === Command::ACK_OK) {
+                    // Normally last. Arriving before a reordered DATA datagram, it must not end
+                    // the window early: keep listening, bounded by the empty polls.
+                    $closed = true;
+                }
+            }
+        } finally {
+            if ($this->transport instanceof UdpTransport) {
+                $this->transport->resetReadTimeout();
+            }
+        }
+
+        if ($bytes < $want) {
+            return null;
+        }
+
+        ksort($chunks);
+        if (array_keys($chunks) !== range(0, count($chunks) - 1)) {
+            return null; // a numbered datagram is missing: not this window's bytes in order
+        }
+
+        if (! $closed) {
+            // The window's acknowledgement; consumed so it is not the next request's answer.
+            $this->transport->readUnsolicited(0.2);
+        }
+
+        return substr(implode('', $chunks), 0, $want);
     }
 
     /**

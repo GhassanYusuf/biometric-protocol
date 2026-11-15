@@ -6,6 +6,31 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.24.0 — 2026-11-15
+
+### Fixed — a slow window over UDP no longer shifts the rest of the read
+
+- `BulkReader::readWindow()`: when a `READ_BUFFER` request times out on a transport that knows its
+  request ids (`UdpTransport`), the reader waits up to 20 s (`LATE_REPLY_POLLS`) for that
+  request's own answer instead of sending it again; only then does the 2.1.0 retry run. Host app
+  casebook DC-047: on gems workshop (F18, internet) a window request sometimes goes unanswered for
+  just over the 8 s timeout, and once the same window is requested twice the device serves it and
+  every later window of the session 16 or 20 bytes off — clean, correctly numbered datagrams, but
+  16,276 punches decoding as 409. Re-requesting: 3 of 3 such reads shifted. Waiting: 8 of 8 reads
+  whole, the late answers arriving within milliseconds of the timeout (traces
+  `datagram-headers-05…07`, 2026-11-15).
+- New `BulkReader::readNumberedWindow()`: a window is built only from datagrams carrying the
+  request's reply id, each placed by its sequence number (the DATA header's session-id field);
+  repeats are ignored, a gap refuses the window, the closing ACK_OK is consumed. CONFIRMED on the
+  F18 (gems workshop, IT ROOM), F22 (On The Road) and UA300 (Catering), 378 windows: every
+  PREPARE_DATA, DATA and ACK_OK of a window carries the request's reply id, and DATA datagrams are
+  numbered 0, 1, 2 … 1,024 bytes each except the last (traces `datagram-headers-01…04`).
+- New contract `Contracts\TracksRequestIds` (`lastRequestId()`), implemented by `UdpTransport`.
+  `TcpTransport` and transports without it keep the arrival-order path unchanged.
+- Tests: `NumberedWindowTest` (a slow window is waited for and requested once; asking again shifts
+  the rest on this firmware; a late answer after the drain, reordered and repeated datagrams, and a
+  numbered gap are all read correctly).
+
 ## 2.23.0 — 2026-11-11
 
 ### Changed — the UA300 can make a user administrator or normal user
