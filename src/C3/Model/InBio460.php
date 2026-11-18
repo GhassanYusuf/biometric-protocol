@@ -59,6 +59,12 @@ final class InBio460 implements PanelModel
     public function capabilities(): CapabilitySet
     {
         return C3Capabilities::defaults()->with([
+            // Doors (2026-11-18, Glass Door 192.168.7.61): RTLOG (0x0B) answered with real-time events
+            // and a door status record (doors 1–2 open/closed and alarms) — decoded per the reference
+            // (RtLogCodec). IMPLEMENTED, not confirmed: what the panel calls "open" is not yet checked
+            // against the doors themselves.
+            Capability::DOOR_EVENTS => Capability::IMPLEMENTED,
+            Capability::DOOR_STATUS => Capability::IMPLEMENTED,
             Capability::PING => Capability::CONFIRMED,
             Capability::DEVICE_INFO => Capability::CONFIRMED,
             Capability::ATTENDANCE_READ => Capability::CONFIRMED,

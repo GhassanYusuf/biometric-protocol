@@ -162,6 +162,13 @@ final class CapabilitySet
             Capability::ANTI_PASSBACK => Capability::UNKNOWN,
             Capability::DURESS => Capability::UNKNOWN,
             Capability::RELAY => Capability::UNKNOWN,
+
+            // Doors (2026-11-18). The operation log — exit-button presses, alarms, start-ups — read and
+            // decoded on three F18s (IT ROOM, City One, Gems; OperationLogCodec), and the lock settings
+            // on three (DC-035). Live door state is NOT available: CMD_DOORSTATE_RRQ (75) answered 01 on
+            // IT ROOM through 40 s of exit-button presses and door openings (host casebook DC-035).
+            Capability::DOOR_EVENTS => Capability::CONFIRMED,
+            Capability::DOOR_STATUS => Capability::NOT_IMPLEMENTED,
         ]);
     }
 

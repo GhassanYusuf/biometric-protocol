@@ -53,6 +53,9 @@ final class GenericTerminal implements TerminalModel
         ] as $write) {
             $levels[$write] = Capability::UNKNOWN;
         }
+        // Doors were read on the F18 only (2026-11-18); a model nobody has read claims nothing.
+        $levels[Capability::DOOR_EVENTS] = Capability::UNKNOWN;
+        $levels[Capability::DOOR_STATUS] = Capability::UNKNOWN;
 
         return CapabilitySet::fromArray($levels);
     }

@@ -108,6 +108,13 @@ final class Command
      */
     public const SET_DATA = 0x07;
 
+    /**
+     * The real-time log: latest events, then the current door/alarm status (RtLogCodec). Transcribed
+     * from vwout/zkaccess-c3-py consts.py (RTLOG_BINARY = 0x0B). Read-only. Seen answering on the
+     * inBIO460 and TF1700, 2026-11-18.
+     */
+    public const RTLOG = 0x0B;
+
     /** Reads rows from a table. CONFIRMED inBIO460, TF1700 — answers PREPARE_DATA. */
     public const GET_DATA = 0x08;
 

@@ -168,6 +168,12 @@ datagrams carrying the request's reply id, placed by the sequence number the dev
 header's session-id field, so a stray or repeated datagram can never become data. Both
 behaviours were confirmed on the F18, F22 and UA300 (2026-11-15). TCP is unchanged.
 
+**Doors (2.25.0).** `Device::operationLog()` returns an F18's operation log (start-ups, menu visits,
+enrolments, alarms and exit-button presses, with times); `Device::doorSettings()` its lock settings. Neither
+gives the live state of the door: an F18 does not report it. A C3 panel does: `Panel::realtime($tz)` returns
+its latest events and, on the inBIO460, a status record with each door open / closed and its alarms. Gated by
+`door.events` and `door.status`. None of these opens a door.
+
 **Buffer size.** The OS default receive buffer is 64 KB. One attendance table on
 an F18 is 412 KB. The protocol has no flow control, so the moment your reader
 pauses the device keeps transmitting and the kernel drops everything past the

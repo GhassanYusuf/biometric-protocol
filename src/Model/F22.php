@@ -39,6 +39,9 @@ final class F22 implements TerminalModel
     public function capabilities(): CapabilitySet
     {
         return CapabilitySet::defaults()->with([
+            // Doors: read on the F18 only (2026-11-18). Not inherited until an F22 is read (rule 15).
+            Capability::DOOR_EVENTS => Capability::UNKNOWN,
+            Capability::DOOR_STATUS => Capability::UNKNOWN,
             /*
              * Reads: CONFIRMED on the F22 2026-09-13/15 — info, users (push path; the
              * users table refuses WINDOWED reads with reply 4991), attendance

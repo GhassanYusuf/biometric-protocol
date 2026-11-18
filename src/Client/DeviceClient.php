@@ -200,6 +200,33 @@ class DeviceClient
     }
 
     /**
+     * Raw bytes of the operation log (DB_RRQ + FCT_OPLOG, the windowed read). CONFIRMED 2026-11-18 on
+     * three F18s; decode with OperationLogCodec. Read-only.
+     */
+    public function readOperationLogRaw(): string
+    {
+        return $this->bulk()->read(Command::DB_RRQ, chr(Command::FCT_OPLOG), 'oplog');
+    }
+
+    /**
+     * The door / lock settings the terminal holds, by name (CMD_OPTIONS_RRQ per name, read-only).
+     * CONFIRMED 2026-10-27 on three F18s (IT ROOM, Camelot, Good Wheels; host app casebook DC-035):
+     * ~LockFunOn, LockOn (seconds the lock opens for), DoorSensorTimeout (seconds), MasterState.
+     * A name this firmware does not have answers "Read error" (4999) and comes back as ''.
+     *
+     * @return array<string,string>
+     */
+    public function doorSettings(): array
+    {
+        $out = [];
+        foreach (['~LockFunOn', 'LockOn', 'DoorSensorTimeout', 'MasterState'] as $name) {
+            $out[$name] = $this->safeString(fn () => $this->deviceParameter($name));
+        }
+
+        return $out;
+    }
+
+    /**
      * Reads one named device parameter via CMD_DEVICE.
      *
      * The device answers "Name=Value"; we return just the value.

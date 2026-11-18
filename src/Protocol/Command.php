@@ -122,6 +122,8 @@ final class Command
      * read returns (pyzk's FCT_* constants).
      */
     public const FCT_FINGERTMP = 2;
+    // The operation log. CONFIRMED 2026-11-18 on three F18s (OperationLogCodec); pyzk FCT_OPLOG = 4.
+    public const FCT_OPLOG = 4;
     public const FCT_USER = 5;
 
     public const USHRT_MAX = 0xFFFF;

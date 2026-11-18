@@ -82,6 +82,12 @@ final class Capability
     public const DURESS = 'access.duress';
     public const RELAY = 'access.relay';
 
+    // Doors (2026-11-18). door.events: the terminal's own record of door and alarm events (an F18's
+    // operation log; a C3 panel's real-time events). door.status: the door open / closed and its
+    // alarms, live (a C3 panel's real-time status record). Neither opens a door.
+    public const DOOR_EVENTS = 'door.events';
+    public const DOOR_STATUS = 'door.status';
+
     /**
      * CONFIRMED — exercised against real hardware in this project. Safe to expose.
      */

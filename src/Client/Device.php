@@ -183,6 +183,26 @@ final class Device
         return $this->client->getDeviceInfo();
     }
 
+    /**
+     * The operation log, decoded (OperationLogCodec). Capability-gated: door.events.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function operationLog(): array
+    {
+        $this->capabilities()->require(\Promoseven\Biometric\Capability\Capability::DOOR_EVENTS);
+
+        return \Promoseven\Biometric\Codec\OperationLogCodec::decode($this->client->readOperationLogRaw(), $this->config()->timezone);
+    }
+
+    /** @return array<string,string> the door / lock settings the terminal holds (DeviceClient::doorSettings) */
+    public function doorSettings(): array
+    {
+        $this->capabilities()->require(\Promoseven\Biometric\Capability\Capability::DOOR_EVENTS);
+
+        return $this->client->doorSettings();
+    }
+
     public function time(): ?\DateTimeImmutable
     {
         return $this->client->getTime();

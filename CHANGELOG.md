@@ -6,6 +6,26 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.25.0 — 2026-11-18
+
+### Added — doors: the F18 operation log, its lock settings, and a C3 panel's real-time log
+
+- `Codec\OperationLogCodec` and `DeviceClient::readOperationLogRaw()` / `Device::operationLog()`: the
+  terminal's operation log (DB_RRQ + new `Command::FCT_OPLOG` = 4) — 16-byte records, code at byte 2, packed
+  time at 4–7, parameters at 8–15. CONFIRMED on three F18s (IT ROOM, City One, Gems) against known events.
+  Alarm types of code 3: 53 exit button (CONFIRMED, IT ROOM), 54 door sensor, 55 alarm (CONFIRMED). A clear
+  sent over the network is not recorded (CONFIRMED on Gems).
+- `DeviceClient::doorSettings()` / `Device::doorSettings()`: `~LockFunOn`, `LockOn`, `DoorSensorTimeout`,
+  `MasterState` (read-only; CONFIRMED on three F18s, host casebook DC-035).
+- C3: `Command::RTLOG` (0x0B), `C3\Codec\RtLogCodec`, `Panel::realtime()`: a panel's latest events and its
+  door/alarm status record (type 255), transcribed from vwout/zkaccess-c3-py. Answered on Glass Door
+  (inBIO460) with status for doors 1–2, and on Entrance (TF1700) with events only. Card numbers are never
+  kept from an event, only whether one was presented.
+- Capabilities `door.events` and `door.status`. F18: events CONFIRMED, status NOT_IMPLEMENTED (CMD 75 does not
+  reflect the door). F22, UA300 and unidentified terminals: UNKNOWN (not read). inBIO460: both IMPLEMENTED
+  (what "open" means is not yet checked at the doors). TF1700: events IMPLEMENTED, status UNKNOWN.
+- Tests: `DoorReadTest` (Glass Door's real status record as fixture).
+
 ## 2.24.0 — 2026-11-15
 
 ### Fixed — a slow window over UDP no longer shifts the rest of the read

@@ -108,6 +108,44 @@ final class Panel implements TableStore
     }
 
     /**
+     * The panel's real-time log: the events it has not yet handed out, and its current door/alarm status
+     * (owner, 2026-11-18). Asks RTLOG up to $polls times: a panel with events queued sends those first
+     * (ten per reply), and the status record once caught up. The TF1700 sent no status record and went
+     * silent with nothing new, so a timeout after the first poll ends the read rather than failing it.
+     * Read-only; the transaction table (punches) is separate and untouched.
+     *
+     * @return array{status:?array<string,mixed>, events:list<array<string,mixed>>}
+     */
+    public function realtime(string $timezone, int $polls = 6): array
+    {
+        $this->open();
+        $status = null;
+        $events = [];
+
+        for ($i = 0; $i < $polls && $status === null; $i++) {
+            try {
+                [$code, $payload] = $this->transport->send(Command::RTLOG, '', 4.0);
+            } catch (\Promoseven\Biometric\Exception\TimeoutException $e) {
+                if ($i === 0) {
+                    throw $e;
+                }
+                break;
+            }
+            if ($code !== Command::REPLY_OK) {
+                break;
+            }
+            $part = \Promoseven\Biometric\C3\Codec\RtLogCodec::decode($payload, $timezone);
+            array_push($events, ...$part['events']);
+            $status = $part['status'];
+            if ($part['events'] === [] && $status === null) {
+                break;
+            }
+        }
+
+        return ['status' => $status, 'events' => $events];
+    }
+
+    /**
      * Identity and capacity, as the panel reports them.
      *
      * @return array<string,string>

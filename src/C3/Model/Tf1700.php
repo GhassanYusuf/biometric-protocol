@@ -58,6 +58,10 @@ final class Tf1700 implements PanelModel
     public function capabilities(): CapabilitySet
     {
         return C3Capabilities::defaults()->with([
+            // Doors (2026-11-18, Entrance 192.168.7.60): RTLOG (0x0B) answered once with real-time events
+            // (exit button, punches), then stayed silent with nothing new; no status record seen.
+            Capability::DOOR_EVENTS => Capability::IMPLEMENTED,
+            Capability::DOOR_STATUS => Capability::UNKNOWN,
             Capability::PING => Capability::CONFIRMED,
             Capability::DEVICE_INFO => Capability::CONFIRMED,
             Capability::ATTENDANCE_READ => Capability::CONFIRMED,
