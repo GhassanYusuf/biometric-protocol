@@ -6,6 +6,14 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.25.1 — 2026-11-19
+
+### Changed — the TF1700 is no longer offered door events
+
+- `Tf1700::capabilities()`: `door.events` IMPLEMENTED → **UNKNOWN**. Entrance (TF1700, 192.168.7.60) answered RTLOG
+  once on 2026-11-18, then answered no C3 command at all (it still accepted TCP) until power-cycled — host app
+  casebook DC-050. Hidden until the cause is understood. The inBIO460 is unchanged.
+
 ## 2.25.0 — 2026-11-18
 
 ### Added — doors: the F18 operation log, its lock settings, and a C3 panel's real-time log

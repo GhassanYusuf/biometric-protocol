@@ -58,9 +58,10 @@ final class Tf1700 implements PanelModel
     public function capabilities(): CapabilitySet
     {
         return C3Capabilities::defaults()->with([
-            // Doors (2026-11-18, Entrance 192.168.7.60): RTLOG (0x0B) answered once with real-time events
-            // (exit button, punches), then stayed silent with nothing new; no status record seen.
-            Capability::DOOR_EVENTS => Capability::IMPLEMENTED,
+            // Doors: UNKNOWN (2.25.1). On 2026-11-18 Entrance (192.168.7.60) answered RTLOG (0x0B) once with
+            // events, then went silent; from then on it accepted TCP but answered no C3 command at all —
+            // reads, clock, info — until power-cycled (host casebook DC-050). Not offered until understood.
+            Capability::DOOR_EVENTS => Capability::UNKNOWN,
             Capability::DOOR_STATUS => Capability::UNKNOWN,
             Capability::PING => Capability::CONFIRMED,
             Capability::DEVICE_INFO => Capability::CONFIRMED,

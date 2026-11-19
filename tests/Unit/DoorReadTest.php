@@ -87,7 +87,8 @@ final class DoorReadTest extends TestCase
         }
 
         $this->assertSame(Capability::IMPLEMENTED, C3Capabilities::forModel('inBIO460')->level(Capability::DOOR_STATUS));
-        $this->assertSame(Capability::IMPLEMENTED, C3Capabilities::forModel('TF1700')->level(Capability::DOOR_EVENTS));
+        // 2.25.1: the TF1700 stopped answering after RTLOG (host casebook DC-050).
+        $this->assertSame(Capability::UNKNOWN, C3Capabilities::forModel('TF1700')->level(Capability::DOOR_EVENTS));
         $this->assertSame(Capability::UNKNOWN, C3Capabilities::forModel('TF1700')->level(Capability::DOOR_STATUS));
     }
 }
