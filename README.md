@@ -338,7 +338,7 @@ Three things to know before you rely on it:
   `true` when acknowledged and `false` when the panel dropped the link or never
   answered — it may have rebooted before replying. Neither proves a restart: confirm
   by watching the panel stop answering and answer again. Offered (IMPLEMENTED) on the
-  inBIO460 only; doors and readers are out while it reboots.
+  inBIO460 and the TF1700 (2.26.1); doors and readers are out while it reboots.
 
 ## Compatibility
 

@@ -61,11 +61,13 @@ final class C3RestartTest extends TestCase
         $this->assertFalse($panel->restart());
     }
 
-    public function test_only_the_inbio460_offers_it_until_another_model_has_run_it(): void
+    public function test_the_two_panels_offer_it_with_a_warning_and_no_other_model_does(): void
     {
         $this->assertSame(Capability::IMPLEMENTED, C3Capabilities::forModel('inBIO460')->level(Capability::RESTART));
-        $this->assertSame(Capability::UNKNOWN, C3Capabilities::forModel('TF1700')->level(Capability::RESTART));
+        // 2.26.1: the TF1700 too, by the owner's go-ahead (Entrance). Its own level, not inherited.
+        $this->assertSame(Capability::IMPLEMENTED, C3Capabilities::forModel('TF1700')->level(Capability::RESTART));
         $this->assertSame(Capability::UNKNOWN, C3Capabilities::forModel('C3-400')->level(Capability::RESTART));
+        $this->assertSame(Capability::UNKNOWN, C3Capabilities::forModel(null)->level(Capability::RESTART));
     }
 
     /** @return array{0:resource, 1:int} */

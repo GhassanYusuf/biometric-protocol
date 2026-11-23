@@ -6,6 +6,14 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.26.1 — 2026-11-23
+
+### Changed — the TF1700 is offered restart
+
+- `Tf1700::capabilities()`: `device.restart` UNKNOWN → **IMPLEMENTED**, by the owner's go-ahead to make it ready
+  for Entrance (192.168.7.60). Same frame as the inBIO460; not yet seen to work on either. Recorded risk: this
+  panel went silent after RTLOG on 2026-11-18 until power-cycled (host casebook DC-050).
+
 ## 2.26.0 — 2026-11-23
 
 ### Added — restart a C3 panel

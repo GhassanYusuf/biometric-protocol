@@ -63,6 +63,12 @@ final class Tf1700 implements PanelModel
             // reads, clock, info — until power-cycled (host casebook DC-050). Not offered until understood.
             Capability::DOOR_EVENTS => Capability::UNKNOWN,
             Capability::DOOR_STATUS => Capability::UNKNOWN,
+            // Restart (2.26.1): offered IMPLEMENTED by the owner's go-ahead of 2026-11-23 to make it ready for
+            // Entrance (192.168.7.60) — Glass Door, the first choice, had a problem of its own that day. Same
+            // CONTROL_DEVICE op 3 frame as the inBIO460, session-less after CONNECT_SESSION_LESS. Not yet seen
+            // to work on this model. RISK, recorded: after RTLOG on 2026-11-18 this panel stopped answering
+            // until power-cycled (host casebook DC-050) — run it with someone at the panel.
+            Capability::RESTART => Capability::IMPLEMENTED,
             Capability::PING => Capability::CONFIRMED,
             Capability::DEVICE_INFO => Capability::CONFIRMED,
             Capability::ATTENDANCE_READ => Capability::CONFIRMED,
