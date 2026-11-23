@@ -70,14 +70,22 @@ final class Command
     public const GET_PARAM = 0x04;
 
     /**
-     * The door relay.
+     * Device control: 5 bytes — operation, then four parameters. Transcribed from
+     * vwout/zkaccess-c3-py (consts.py `CONTROL = 0x05`, `ControlOperation`;
+     * controldevice.py `to_bytes()`), read 2026-11-23:
      *
-     * DOCUMENTED, never sent. This is a WRITE that physically unlocks a door, and
-     * rule 16 puts it behind the owner's explicit authorization and a terminal out
-     * of service. It is declared here so that nobody rediscovers the number by
-     * sweeping for it against a live entrance.
+     *   1 OUTPUT          door / aux relay — opens a door. NEVER SENT by this library.
+     *   2 CANCEL_ALARM    not built.
+     *   3 RESTART_DEVICE  Panel::restart(), payload 03 00 00 00 00 (2.26.0).
+     *   4 ENDIS_NO_STATE  normal-open on/off — leaves a door open. Not built.
+     *
+     * Only the restart is sent (owner's go-ahead, 2026-11-23). The relay operations
+     * stay unbuilt: a door is not something to discover by accident (rule 16).
      */
     public const CONTROL_DEVICE = 0x05;
+
+    /** CONTROL_DEVICE operation 3. DOCUMENTED (zkaccess-c3-py `RESTART_DEVICE = 3`). */
+    public const CONTROL_RESTART = 3;
 
     /** The data-table catalogue. CONFIRMED inBIO460 (12 tables), TF1700 (11 tables). */
     public const DATATABLE_CFG = 0x06;
@@ -196,5 +204,11 @@ final class Command
     public static function describeError(int $code): string
     {
         return self::ERRORS[$code] ?? "Device refused with code {$code}";
+    }
+
+    /** The CONTROL_DEVICE payload that restarts the panel: operation 3, four zero parameters. */
+    public static function restartPayload(): string
+    {
+        return pack('C5', self::CONTROL_RESTART, 0, 0, 0, 0);
     }
 }

@@ -6,6 +6,24 @@ Versions before 2.1.0 predate this file; the library is consumed as `@dev` until
 it is given its own git repository and tags (a known blocker recorded in the host
 app's `docs/PROJECT-STATE.md`). `2.3.0` is the tag to cut when that happens.
 
+## 2.26.0 — 2026-11-23
+
+### Added — restart a C3 panel
+
+- `C3\Protocol\Command::CONTROL_RESTART` (3) and `restartPayload()` (`03 00 00 00 00`), and
+  `C3\Client\Panel::restart()`: CONTROL_DEVICE (0x05) operation 3, transcribed from vwout/zkaccess-c3-py
+  (`consts.py` `ControlOperation.RESTART_DEVICE = 3`, `controldevice.py` 5-byte payload), read 2026-11-23.
+  Returns true on REPLY_OK, false on a timeout or dropped link (the reference does not say the panel answers
+  before rebooting); throws on REPLY_ERROR. Sends no DISCONNECT afterwards. The caller confirms the restart by
+  the panel going away and answering again (the host app's DeviceRestartService does).
+- The door-relay operations of the same command (1 output, 4 normal-open) remain unbuilt.
+
+### Changed
+
+- `device.restart`: C3 family default NOT_IMPLEMENTED → **UNKNOWN** (the library can now do it; no model has
+  been seen to). `InBio460`: **IMPLEMENTED** (owner's go-ahead to run it on Glass Door first). TF1700: UNKNOWN,
+  hidden.
+
 ## 2.25.1 — 2026-11-19
 
 ### Changed — the TF1700 is no longer offered door events

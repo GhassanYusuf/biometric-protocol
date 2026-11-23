@@ -78,7 +78,9 @@ final class C3Capabilities
             Capability::ATTENDANCE_CLEAR => Capability::NOT_IMPLEMENTED,
             Capability::DEVICE_WIPE => Capability::NOT_IMPLEMENTED,
             Capability::SET_TIME => Capability::NOT_IMPLEMENTED,
-            Capability::RESTART => Capability::NOT_IMPLEMENTED,
+            // 2.26.0: Panel::restart() exists, but no panel has been seen to restart. A model offers it
+            // only from its own file (the inBIO460, IMPLEMENTED); every other model stays hidden.
+            Capability::RESTART => Capability::UNKNOWN,
 
             // The panel pushes nothing this library listens for. The vendor polls
             // GetRTLog on a one-second thread; we have not built that.

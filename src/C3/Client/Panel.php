@@ -610,6 +610,57 @@ final class Panel implements TableStore
     }
 
     /**
+     * Restarts the panel: CONTROL_DEVICE (0x05) operation 3, payload 03 00 00 00 00,
+     * transcribed from vwout/zkaccess-c3-py (Command::CONTROL_DEVICE). WRITES TO THE
+     * DEVICE — nothing stored changes, but the panel reboots and its doors and readers
+     * are out for the reboot.
+     *
+     * The reference expects REPLY_OK before the reboot, but does not say the panel
+     * always sends it first. So: true = acknowledged; false = no reply (or the link
+     * dropped) — which may mean it rebooted before answering, or never got it. Either
+     * way the caller must confirm by watching it go away and answer again (rule 10);
+     * the acknowledgement alone proves nothing. A refusal (REPLY_ERROR) throws.
+     *
+     * The session is over afterwards: no DISCONNECT is sent to a rebooting panel.
+     *
+     * EXPERIMENTAL — written from the reference; the inBIO460 is IMPLEMENTED until it
+     * has been seen to restart.
+     */
+    public function restart(): bool
+    {
+        try {
+            [$reply, $payload] = $this->command(Command::CONTROL_DEVICE, Command::restartPayload(), 5.0);
+        } catch (DeviceException $e) {
+            if ($e instanceof ProtocolException) {
+                throw $e;
+            }
+            // Timeout or a dropped link: the panel may already be rebooting.
+            $this->abandon();
+
+            return false;
+        }
+
+        if ($reply !== Command::REPLY_OK) {
+            throw $this->refusal('restart', $reply, $payload);
+        }
+
+        $this->abandon();
+
+        return true;
+    }
+
+    /** Drops the socket without a DISCONNECT — for a panel that is going away. */
+    private function abandon(): void
+    {
+        try {
+            $this->transport->close();
+        } catch (\Throwable) {
+        }
+        $this->open = false;
+        $this->catalogue = null;
+    }
+
+    /**
      * Round-trips a command, opening the session lazily.
      *
      * @return array{0:int, 1:string}

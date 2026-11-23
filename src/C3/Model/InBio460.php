@@ -65,6 +65,9 @@ final class InBio460 implements PanelModel
             // against the doors themselves.
             Capability::DOOR_EVENTS => Capability::IMPLEMENTED,
             Capability::DOOR_STATUS => Capability::IMPLEMENTED,
+            // Restart (2.26.0, owner's go-ahead 2026-11-23 for Glass Door first): CONTROL_DEVICE op 3 per the
+            // reference. IMPLEMENTED until Glass Door has been seen to go away and answer again.
+            Capability::RESTART => Capability::IMPLEMENTED,
             Capability::PING => Capability::CONFIRMED,
             Capability::DEVICE_INFO => Capability::CONFIRMED,
             Capability::ATTENDANCE_READ => Capability::CONFIRMED,

@@ -334,6 +334,11 @@ Three things to know before you rely on it:
   count them instead of wondering where they went.
 - **The read is CRC-verified by the protocol.** A checksum mismatch throws. You will
   never be handed a short table that looks complete.
+- **`restart()` writes to the panel** (2.26.0): CONTROL_DEVICE operation 3. It returns
+  `true` when acknowledged and `false` when the panel dropped the link or never
+  answered — it may have rebooted before replying. Neither proves a restart: confirm
+  by watching the panel stop answering and answer again. Offered (IMPLEMENTED) on the
+  inBIO460 only; doors and readers are out while it reboots.
 
 ## Compatibility
 
